@@ -5,9 +5,10 @@
   interface Props {
     onschema: (schema: NormalizedSchema) => void;
     onreset: () => void;
+    onyaml?: (text: string) => void;
   }
 
-  let { onschema, onreset }: Props = $props();
+  let { onschema, onreset, onyaml }: Props = $props();
 
   let dragging = $state(false);
   let error = $state('');
@@ -32,6 +33,7 @@
         error = 'No classes found in schema. Is this a valid LinkML schema?';
         return;
       }
+      onyaml?.(text);
       onschema(schema);
       open = false;
     } catch (e) {

@@ -3,8 +3,6 @@
   import {
     SvelteFlow,
     Background,
-    Controls,
-    ControlButton,
     MiniMap,
     type Node,
     type Edge,
@@ -15,10 +13,14 @@
   import SearchBar from '$lib/components/SearchBar.svelte';
   import FlowController from '$lib/components/FlowController.svelte';
   import DomainLegend from '$lib/components/DomainLegend.svelte';
+  import CustomControls from '$lib/components/CustomControls.svelte';
+  import SchemaEditor from '$lib/components/SchemaEditor.svelte';
+  import DomainEditor from '$lib/components/DomainEditor.svelte';
 
-  import { loadDefaultSchema, loadDomainConfig } from '$lib/linkml';
+  import { loadDefaultSchema, loadDomainConfig, parseLinkMLSchema } from '$lib/linkml';
   import { buildGraph } from '$lib/layout';
   import type { NormalizedSchema, LayoutOptions, DomainInfo } from '$lib/types';
+  import { base } from '$app/paths';
 
   // ---------------------------------------------------------------------------
   // Domain config — set context synchronously with a reactive holder so
@@ -53,6 +55,18 @@
 
   // Pan target set by search, cleared by FlowController after use
   let panTarget = $state<string | null>(null);
+
+  // Editor panel visibility
+  let schemaEditorOpen = $state(false);
+  let domainEditorOpen = $state(false);
+
+  // Raw YAML text kept in sync with the current schema (for SchemaEditor)
+  let schemaYamlText = $state('');
+
+  // Domain list derived from domainCtx.map for DomainEditor
+  const domainList = $derived<DomainInfo[]>(
+    domainCtx.map ? Array.from(domainCtx.map.values()) : []
+  );
 
   // ---------------------------------------------------------------------------
   // Rebuild graph whenever schema, collapsed, or layoutOptions change (async)
@@ -94,7 +108,10 @@
   async function loadDefault() {
     loadError = '';
     try {
-      schema = await loadDefaultSchema();
+      // Fetch raw text so we can populate the schema editor
+      const text = await fetch(`${base}/omop_cdm.yaml`).then((r) => r.text());
+      schema = parseLinkMLSchema(text);
+      schemaYamlText = text;
       collapsed = new Set();
     } catch (e) {
       loadError = `Failed to load default schema: ${(e as Error).message}`;
@@ -104,6 +121,22 @@
   function handleUploadedSchema(s: NormalizedSchema) {
     schema = s;
     collapsed = new Set();
+  }
+
+  function handleUploadedYaml(text: string) {
+    schemaYamlText = text;
+  }
+
+  // Called by SchemaEditor when the user edits the YAML and it parses cleanly
+  function handleSchemaEditorChange(text: string, parsed: NormalizedSchema) {
+    schemaYamlText = text;
+    schema = parsed;
+    collapsed = new Set();
+  }
+
+  // Called by DomainEditor when colors/names change
+  function handleDomainEditorChange(domains: DomainInfo[]) {
+    domainCtx.map = new Map(domains.map((d) => [d.name, d]));
   }
 
   onMount(() => {
@@ -123,20 +156,9 @@
   // ---------------------------------------------------------------------------
   // Layout button helpers
   // ---------------------------------------------------------------------------
-  const LAYOUT_BUTTONS: Array<{ engine: LayoutOptions['engine']; direction: LayoutOptions['direction']; label: string; title: string }> = [
-    { engine: 'dagre', direction: 'LR', label: 'D→', title: 'Dagre — left to right' },
-    { engine: 'dagre', direction: 'TB', label: 'D↓', title: 'Dagre — top to bottom' },
-    { engine: 'elk',   direction: 'LR', label: 'E→', title: 'ELK — left to right' },
-    { engine: 'elk',   direction: 'TB', label: 'E↓', title: 'ELK — top to bottom' },
-  ];
-
-  function isActive(btn: typeof LAYOUT_BUTTONS[number]) {
-    return layoutOptions.engine === btn.engine && layoutOptions.direction === btn.direction;
-  }
-
-  function selectLayout(btn: typeof LAYOUT_BUTTONS[number]) {
+  function selectLayout(opts: LayoutOptions) {
     if (layoutLoading) return;
-    layoutOptions = { engine: btn.engine, direction: btn.direction };
+    layoutOptions = opts;
   }
 
   // ---------------------------------------------------------------------------
@@ -157,6 +179,14 @@
 
   // Only show the legend when at least one node has a domain annotation.
   const hasDomains = $derived(activeDomainNames.length > 0);
+
+  // Edge count label: distinguish FK vs ETL
+  const fkEdgeCount = $derived(
+    edges.filter((e) => (e.data as unknown as { edgeKind?: string })?.edgeKind !== 'etl').length
+  );
+  const etlEdgeCount = $derived(
+    edges.filter((e) => (e.data as unknown as { edgeKind?: string })?.edgeKind === 'etl').length
+  );
 </script>
 
 <div class="app">
@@ -172,7 +202,11 @@
         <span class="app-title">LinkML ERD Viewer</span>
         {#if schema}
           <span class="schema-name">{schemaName}</span>
-          <span class="node-count">{tableCount} tables · {edges.length} FK edges</span>
+          <span class="node-count">
+            {tableCount} tables
+            {#if fkEdgeCount > 0} · {fkEdgeCount} FK{/if}
+            {#if etlEdgeCount > 0} · {etlEdgeCount} ETL{/if}
+          </span>
         {/if}
         {#if loadError}
           <span class="load-error">⚠ {loadError}</span>
@@ -180,75 +214,112 @@
       </div>
       <div class="topbar-right">
         <SearchBar {schema} onselect={handleSearchSelect} />
+
+        <!-- Schema editor toggle -->
+        <button
+          class="editor-btn"
+          class:active={schemaEditorOpen}
+          title="Edit schema YAML"
+          onclick={() => { schemaEditorOpen = !schemaEditorOpen; }}
+          aria-pressed={schemaEditorOpen}
+        >
+          <span class="editor-btn-icon">&lt;/&gt;</span>
+          Schema
+        </button>
+
+        <!-- Domain config editor toggle -->
+        <button
+          class="editor-btn"
+          class:active={domainEditorOpen}
+          title="Edit domain colors"
+          onclick={() => { domainEditorOpen = !domainEditorOpen; }}
+          aria-pressed={domainEditorOpen}
+        >
+          <span class="editor-btn-icon">&#9678;</span>
+          Domains
+        </button>
+
         <div class="uploader-wrap">
-          <SchemaUploader onschema={handleUploadedSchema} onreset={loadDefault} />
+          <SchemaUploader
+            onschema={handleUploadedSchema}
+            onreset={loadDefault}
+            onyaml={handleUploadedYaml}
+          />
         </div>
       </div>
     </div>
 
-    <!-- Svelte Flow canvas -->
-    {#if schema && nodes.length > 0}
-      <SvelteFlow
-        bind:nodes
-        bind:edges
-        {nodeTypes}
-        fitView
-        fitViewOptions={{ padding: 0.15 }}
-        minZoom={0.1}
-        maxZoom={2}
-        proOptions={{ hideAttribution: false }}
-      >
-        <FlowController
-          {panTarget}
-          {nodes}
-          {fitViewTrigger}
-          onpanned={() => { panTarget = null; }}
-          onhighlight={(updated) => { nodes = updated; }}
-        />
-        <Background />
-        <Controls>
-          {#snippet children()}
-            <!-- Separator -->
-            <div class="ctrl-sep" role="separator"></div>
-            {#each LAYOUT_BUTTONS as btn}
-              <ControlButton
-                title={btn.title}
-                onclick={() => selectLayout(btn)}
-                disabled={layoutLoading}
-                class={isActive(btn) ? 'ctrl-btn-active' : ''}
-              >
-                {#if layoutLoading && isActive(btn)}
-                  <span class="ctrl-spin">⟳</span>
-                {:else}
-                  {btn.label}
-                {/if}
-              </ControlButton>
-            {/each}
-          {/snippet}
-        </Controls>
-        <MiniMap
-          nodeColor={(n) => {
-            const domain = (n.data as unknown as { domain?: string }).domain;
-            const map = domainCtx.map;
-            if (!domain || !map) return '#475569';
-            return map.get(domain)?.color ?? map.get('default')?.color ?? '#475569';
-          }}
-          nodeStrokeWidth={3}
-          zoomable
-          pannable
-        />
-      </SvelteFlow>
-    {:else if schema && nodes.length === 0}
-      <div class="empty-state">
-        <p>No tables to show.</p>
-        <p>Upload a LinkML YAML schema to get started.</p>
+    <!-- Main content row: canvas + optional editor panels -->
+    <div class="content-row">
+      <!-- Svelte Flow canvas -->
+      <div class="canvas-area">
+        {#if schema && nodes.length > 0}
+          <SvelteFlow
+            bind:nodes
+            bind:edges
+            {nodeTypes}
+            fitView
+            fitViewOptions={{ padding: 0.15 }}
+            minZoom={0.1}
+            maxZoom={2}
+            proOptions={{ hideAttribution: false }}
+          >
+            <FlowController
+              {panTarget}
+              {nodes}
+              {fitViewTrigger}
+              onpanned={() => { panTarget = null; }}
+              onhighlight={(updated) => { nodes = updated; }}
+            />
+            <Background />
+            <CustomControls
+              {layoutOptions}
+              {layoutLoading}
+              onlayoutselect={selectLayout}
+            />
+            <MiniMap
+              nodeColor={(n) => {
+                const domain = (n.data as unknown as { domain?: string }).domain;
+                const map = domainCtx.map;
+                if (!domain || !map) return '#475569';
+                return map.get(domain)?.color ?? map.get('default')?.color ?? '#475569';
+              }}
+              nodeStrokeWidth={3}
+              zoomable
+              pannable
+            />
+          </SvelteFlow>
+        {:else if schema && nodes.length === 0}
+          <div class="empty-state">
+            <p>No tables to show.</p>
+            <p>Upload a LinkML YAML schema to get started.</p>
+          </div>
+        {:else}
+          <div class="loading-state">
+            <span class="loading-spinner">⟳</span>
+            Loading schema…
+          </div>
+        {/if}
       </div>
-    {:else}
-      <div class="loading-state">
-        <span class="loading-spinner">⟳</span>
-        Loading schema…
-      </div>
-    {/if}
+
+      <!-- Schema YAML editor panel -->
+      {#if schemaEditorOpen}
+        <SchemaEditor
+          yamlText={schemaYamlText}
+          onchange={handleSchemaEditorChange}
+          onclose={() => { schemaEditorOpen = false; }}
+        />
+      {/if}
+
+      <!-- Domain color editor panel -->
+      {#if domainEditorOpen}
+        <DomainEditor
+          domains={domainList}
+          onchange={handleDomainEditorChange}
+          onclose={() => { domainEditorOpen = false; }}
+        />
+      {/if}
+    </div>
   </div>
 </div>
 
@@ -267,6 +338,7 @@
     flex-direction: column;
     overflow: hidden;
     position: relative;
+    min-width: 0;
   }
 
   /* Top bar */
@@ -325,31 +397,62 @@
     flex-shrink: 0;
   }
 
+  /* Editor toggle buttons */
+  .editor-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: #fff;
+    border: 1.5px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #374151;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.12s ease;
+  }
+
+  .editor-btn:hover {
+    border-color: #6b7280;
+    background: #f9fafb;
+  }
+
+  .editor-btn.active {
+    background: #1e293b;
+    border-color: #1e293b;
+    color: #fff;
+  }
+
+  .editor-btn-icon {
+    font-size: 11px;
+    opacity: 0.8;
+  }
+
   .uploader-wrap {
     position: relative;
+  }
+
+  /* Main content row: canvas + panels side by side */
+  .content-row {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  .canvas-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
   }
 
   /* Canvas */
   :global(.svelte-flow) {
     flex: 1;
-  }
-
-  /* Layout buttons inside Controls */
-  .ctrl-sep {
-    width: 100%;
-    height: 1px;
-    background: var(--xy-controls-button-border-color, #eee);
-    margin: 2px 0;
-  }
-
-  :global(.ctrl-btn-active) {
-    background: #475569 !important;
-    color: #fff !important;
-  }
-
-  .ctrl-spin {
-    display: inline-block;
-    animation: spin 0.8s linear infinite;
   }
 
   .empty-state,
