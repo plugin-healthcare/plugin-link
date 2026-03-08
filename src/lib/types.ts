@@ -116,4 +116,5 @@ export interface ErdEdgeData {
   slotName: string;
   required: boolean;
   targetClass: string;
+  edgeKind: 'fk' | 'etl'; // 'fk' = structural FK via range:; 'etl' = exact_mappings ETL
 }

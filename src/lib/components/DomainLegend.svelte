@@ -60,6 +60,10 @@
       <span class="legend-mapping">Table.col</span>
       <span class="legend-text">ETL mapping</span>
     </div>
+    <div class="legend-row">
+      <span class="edge-etl"></span>
+      <span class="legend-text">ETL edge</span>
+    </div>
   </section>
 </aside>
 
@@ -165,5 +169,13 @@
     color: #6366f1;
     font-style: italic;
     font-family: ui-monospace, monospace;
+  }
+  /* ETL edge swatch — dashed indigo line */
+  .edge-etl {
+    display: inline-block;
+    width: 28px;
+    height: 0;
+    border-top: 2px dashed #6366f1;
+    flex-shrink: 0;
   }
 </style>

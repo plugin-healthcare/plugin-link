@@ -16,8 +16,10 @@ const NODE_ROW_HEIGHT = 24;
 const NODE_COLLAPSED_HEIGHT = NODE_HEADER_HEIGHT;
 const MAX_VISIBLE_ROWS = 20;
 
-// Single neutral color for all nodes and edges
+// Single neutral color for all FK nodes and edges
 const NODE_COLOR = '#475569'; // slate-600
+// ETL mapping edge color — matches the indigo exact_mappings badge in TableNode
+const ETL_COLOR = '#6366f1'; // indigo-500
 
 function estimateNodeHeight(slotCount: number, collapsed: boolean): number {
   if (collapsed) return NODE_COLLAPSED_HEIGHT;
@@ -26,7 +28,7 @@ function estimateNodeHeight(slotCount: number, collapsed: boolean): number {
 }
 
 // ---------------------------------------------------------------------------
-// Shared edge-collection helper
+// Shared edge-collection helpers
 // ---------------------------------------------------------------------------
 function collectEdges(
   schema: NormalizedSchema
@@ -43,12 +45,42 @@ function collectEdges(
   return result;
 }
 
+/**
+ * Collect ETL mapping edges derived from exact_mappings.
+ * Each exact_mapping like "omop_cdm54:VisitOccurrence.visit_occurrence_id" produces
+ * one edge from the source HiX class to the target OMOP class (if it exists in the schema).
+ * One edge per slot mapping — i.e. multiple mappings on one slot produce multiple edges.
+ */
+function collectEtlEdges(
+  schema: NormalizedSchema
+): Array<{ source: string; target: string; slotName: string }> {
+  const classNames = new Set(Object.keys(schema.classes));
+  const result: Array<{ source: string; target: string; slotName: string }> = [];
+  for (const [className, cls] of Object.entries(schema.classes)) {
+    for (const slot of cls.slots) {
+      for (const mapping of slot.exact_mappings) {
+        // mapping = "omop_cdm54:VisitOccurrence.visit_occurrence_id"
+        const colonIdx = mapping.lastIndexOf(':');
+        const dotIdx = mapping.indexOf('.', colonIdx);
+        if (colonIdx < 0 || dotIdx < 0) continue;
+        const targetClass = mapping.slice(colonIdx + 1, dotIdx);
+        if (classNames.has(targetClass) && targetClass !== className) {
+          result.push({ source: className, target: targetClass, slotName: slot.name });
+        }
+      }
+    }
+  }
+  return result;
+}
+
 // ---------------------------------------------------------------------------
 // Shared Svelte Flow edge builder
 // ---------------------------------------------------------------------------
-function buildSvelteEdges(
-  allEdges: Array<{ source: string; target: string; slotName: string; required: boolean }>
-): Edge[] {
+type FkEdge = { source: string; target: string; slotName: string; required: boolean; kind: 'fk' };
+type EtlEdge = { source: string; target: string; slotName: string; kind: 'etl' };
+type AnyEdge = FkEdge | EtlEdge;
+
+function buildSvelteEdges(allEdges: AnyEdge[]): Edge[] {
   const edges: Edge[] = [];
   const edgeIdCounts = new Map<string, number>();
   for (const edge of allEdges) {
@@ -56,26 +88,33 @@ function buildSvelteEdges(
     const count = (edgeIdCounts.get(baseId) ?? 0) + 1;
     edgeIdCounts.set(baseId, count);
     const edgeId = count > 1 ? `${baseId}-${count}` : baseId;
+
+    const isEtl = edge.kind === 'etl';
+    const color = isEtl ? ETL_COLOR : NODE_COLOR;
+    const strokeWidth = isEtl ? 1.5 : (edge.kind === 'fk' && edge.required ? 2 : 1.5);
+    const dashArray = isEtl ? '5,3' : undefined;
+
     edges.push({
       id: edgeId,
       source: edge.source,
       target: edge.target,
       type: 'smoothstep',
       animated: false,
-      style: `stroke: ${NODE_COLOR}; stroke-width: ${edge.required ? 2 : 1.5};`,
+      style: `stroke: ${color}; stroke-width: ${strokeWidth};${dashArray ? ` stroke-dasharray: ${dashArray};` : ''}`,
       markerEnd: {
         type: MarkerType.ArrowClosed,
-        color: NODE_COLOR,
+        color,
         width: 16,
         height: 16,
       },
       data: {
         slotName: edge.slotName,
-        required: edge.required,
+        required: isEtl ? false : (edge.kind === 'fk' && edge.required),
         targetClass: edge.target,
+        edgeKind: edge.kind,
       } as unknown as Record<string, unknown>,
       label: edge.slotName,
-      labelStyle: 'font-size: 10px; fill: #6b7280;',
+      labelStyle: `font-size: 10px; fill: ${isEtl ? ETL_COLOR : '#6b7280'};`,
     });
   }
   return edges;
@@ -89,7 +128,9 @@ function buildGraphDagre(
   collapsed: Set<string>,
   direction: 'LR' | 'TB'
 ): { nodes: Node[]; edges: Edge[] } {
-  const allEdges = collectEdges(schema);
+  const fkEdges: AnyEdge[] = collectEdges(schema).map(e => ({ ...e, kind: 'fk' as const }));
+  const etlEdges: AnyEdge[] = collectEtlEdges(schema).map(e => ({ ...e, kind: 'etl' as const }));
+  const allEdges: AnyEdge[] = [...fkEdges, ...etlEdges];
 
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
@@ -149,7 +190,9 @@ async function buildGraphElk(
   const ELK = (await import('elkjs')).default;
   const elk = new ELK();
 
-  const allEdges = collectEdges(schema);
+  const fkEdges: AnyEdge[] = collectEdges(schema).map(e => ({ ...e, kind: 'fk' as const }));
+  const etlEdges: AnyEdge[] = collectEtlEdges(schema).map(e => ({ ...e, kind: 'etl' as const }));
+  const allEdges: AnyEdge[] = [...fkEdges, ...etlEdges];
   const isLR = direction === 'LR';
 
   const elkNodes = Object.entries(schema.classes).map(([className, cls]) => ({
