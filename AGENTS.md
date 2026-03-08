@@ -28,7 +28,7 @@ npm run check # svelte-check type checking
 |---|---|
 | Framework | SvelteKit 2 + Svelte 5 (runes syntax) |
 | Canvas | `@xyflow/svelte` v1.5.x (Svelte Flow) |
-| Layout engine | `@dagrejs/dagre` v2 (LR directed graph) |
+| Layout engines | `@dagrejs/dagre` v2 (sync) + `elkjs` (async, ELK layered) |
 | YAML parsing | `js-yaml` v4 |
 | Language | TypeScript 5, strict mode |
 | Build tool | Vite 7 |
@@ -40,21 +40,26 @@ npm run check # svelte-check type checking
 
 ```
 plugin-link/
+├── .github/workflows/deploy.yml  # deploy to GitHub Pages on push to main
 ├── justfile                      # default recipe: npm run dev
 ├── svelte.config.js              # adapter-static, base: /plugin-link in prod
+├── vite.config.ts                # sveltekit() plugin + elkjs web-worker externals
 ├── static/
-│   └── omop_cdm.yaml             # default schema (OMOP CDM v5.4, fully merged, 13 879 lines)
+│   ├── omop_cdm.yaml             # default schema (OMOP CDM v5.4, fully merged, 13 879 lines)
+│   └── logo.png                  # favicon
 └── src/
     ├── routes/
     │   ├── +layout.ts            # prerender=true, ssr=false (pure client-side SPA)
-    │   ├── +layout.svelte        # Svelte Flow CSS import, global box-sizing/overflow
-    │   └── +page.svelte          # main app: state, canvas wiring, top bar
+    │   ├── +layout.svelte        # Svelte Flow CSS import, favicon, global box-sizing/overflow
+    │   └── +page.svelte          # main app: state, canvas wiring, top bar, layout toolbar
     └── lib/
-        ├── types.ts              # all shared TypeScript interfaces
+        ├── types.ts              # all shared TypeScript interfaces (incl. LayoutOptions, highlighted)
         ├── linkml.ts             # schema parser (YAML + JSON) and loadDefaultSchema()
-        ├── layout.ts             # dagre auto-layout → Svelte Flow nodes/edges
+        ├── layout.ts             # async buildGraph(schema, collapsed, LayoutOptions) — dagre + elk
         └── components/
-            ├── TableNode.svelte  # custom node: collapsible table card with slot rows
+            ├── FlowController.svelte  # useSvelteFlow() context — pan/highlight/fitView
+            ├── SearchBar.svelte       # top-bar search with keyboard nav and canvas pan
+            ├── TableNode.svelte       # custom node: collapsible table card with amber highlight
             └── SchemaUploader.svelte  # top-bar button + drag-and-drop file picker
 ```
 
@@ -150,13 +155,22 @@ Scanning all classes (not just the first) avoids misidentification when the firs
 
 ## Auto-layout (`src/lib/layout.ts`)
 
-`buildGraph(schema, collapsed)` produces `Node[]` and `Edge[]` for Svelte Flow.
+`buildGraph(schema, collapsed, layoutOptions)` produces `Node[]` and `Edge[]` for Svelte Flow. It is **async** to support the ELK engine.
 
-- **dagre** is run in `LR` (left-to-right) rank direction.
-- Node heights are estimated from slot count: `header (36px) + rows × 24px + 8px padding`, capped at 20 visible rows. Collapsed nodes use only the header height (36px).
-- All nodes and edges use a single neutral color: `#475569` (slate-600). Required FK edges get `stroke-width: 2`; optional get `1.5`.
-- Edge IDs are `source--slotName--target`, with a counter suffix for duplicates.
-- Isolated nodes (no dagre position) are skipped silently.
+### Layout engines
+
+Two engines are supported, selected via `LayoutOptions`:
+
+- **dagre** (`engine: 'dagre'`): synchronous, uses `@dagrejs/dagre` v2. Direction is `LR` or `TB` via `rankdir`.
+- **ELK** (`engine: 'elk'`): async, uses `elkjs` with the `org.eclipse.elk.layered` algorithm. Direction controlled via `elk.direction` (`RIGHT` or `DOWN`).
+
+### Node sizing
+
+Node heights are estimated from slot count: `header (36px) + rows × 24px + 8px padding`, capped at 20 visible rows. Collapsed nodes use only the header height (36px).
+
+### Edges
+
+All nodes and edges use a single neutral color: `#475569` (slate-600). Required FK edges get `stroke-width: 2`; optional get `1.5`. Edge IDs are `source--slotName--target`, with a counter suffix for duplicates. Isolated nodes (no layout position) are skipped silently.
 
 ---
 
@@ -166,6 +180,7 @@ Scanning all classes (not just the first) avoids misidentification when the firs
 - Click the header to toggle collapse.
 - Each slot row shows a badge (`PK` in amber, `FK` in slate, blank for plain slots), the display name (bold if required), and the range type in italic gray.
 - Rows beyond 20 are hidden with a "+N more…" overflow indicator.
+- Highlighted nodes (panned-to from search) show a brief amber glow for 1.5s via the `highlighted` flag on `ErdNodeData`.
 - Svelte Flow v1 requires `Node<Data>` where `Data extends Record<string, unknown>`. Since `ErdNodeData` contains `slots: ErdSlot[]` (not assignable to `Record<string, unknown>` under strict mode), `data` is cast via `as unknown as ErdNodeData` in `layout.ts`. In `TableNode.svelte`, the prop is re-derived reactively with `$derived(data as unknown as ErdNodeData)` to avoid the `state_referenced_locally` Svelte 5 lint warning.
 
 ---
@@ -179,9 +194,11 @@ Uses Svelte 5 runes throughout:
 | `$state` | `schema` | Current `NormalizedSchema` (null while loading) |
 | `$state` | `loadError` | Error message string |
 | `$state` | `collapsed` | `Set<string>` of collapsed node IDs |
+| `$state` | `layoutOptions` | Active `LayoutOptions` (engine + direction) |
+| `$state` | `fitViewTrigger` | Counter incremented after layout to trigger `fitView` |
 | `$state.raw` | `nodes` | `Node[]` — raw avoids deep reactivity overhead |
 | `$state.raw` | `edges` | `Edge[]` — raw avoids deep reactivity overhead |
-| `$effect` | — | Rebuilds `nodes`/`edges` when `schema` or `collapsed` changes |
+| `$effect` | — | Rebuilds `nodes`/`edges` (async IIFE with cancellation flag) when `schema`, `collapsed`, or `layoutOptions` changes |
 | `$derived` | `classCount`, `schemaName`, `tableCount` | Computed display values |
 
 `$state.raw` is used for `nodes` and `edges` per the [Svelte Flow performance recommendation](https://github.com/sveltejs/svelte/issues/11851) — deep reactivity on large node arrays causes noticeable lag.
@@ -192,14 +209,19 @@ Uses Svelte 5 runes throughout:
 
 - **`svelte.config.js`**: uses `adapter-static` with `fallback: '404.html'` for client-side routing on GitHub Pages. The `base` path is `/plugin-link` in production (`NODE_ENV=production`) and empty in development.
 - **`src/routes/+layout.ts`**: sets `prerender = true` and `ssr = false`, making the entire app a client-side SPA with statically prerendered HTML shells.
-- **`vite.config.ts`**: minimal — just the `sveltekit()` plugin.
+- **`vite.config.ts`**: `sveltekit()` plugin plus two `elkjs`/`web-worker` workarounds:
+  - `optimizeDeps.esbuildOptions` — esbuild plugin that marks `web-worker` as external, suppressing the `Could not resolve "web-worker"` error during `npm run dev` pre-bundling.
+  - `build.rollupOptions.external: ['web-worker']` — suppresses the same warning during the production Rollup build.
+  - `build.chunkSizeWarningLimit: 1600` — silences the bundle-size warning from the ~1.4 MB elkjs chunk.
 
 ---
 
-## Known noise (not bugs)
+## Known pitfalls
 
-- `"handleConnectionChange" is imported … but never used` — originates inside `@xyflow/svelte`; not our code.
-- LSP may show stale type errors in `.svelte` files. **`npm run build` is the ground truth** — the build is clean.
+- **`useSvelteFlow()` must be called inside a child of `<SvelteFlow>`** — calling it at page-level script scope crashes the app to a blank page. It lives in `FlowController.svelte`.
+- **elkjs `web-worker`**: elkjs conditionally `require('web-worker')` in Node environments; in the browser it falls back gracefully but causes build-time errors without the two `vite.config.ts` workarounds above.
+- **`labelBgStyle`** is not a valid property on the `@xyflow/svelte` `Edge` type — do not use it.
+- **LSP stale errors**: LSP may show stale type errors in `.svelte` files (e.g. `LayoutOptions` not found, `buildGraph` wrong arg count). These are false positives — `npm run build` is the ground truth.
 
 ---
 
