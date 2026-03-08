@@ -30,6 +30,7 @@ npm run check # svelte-check type checking
 | Canvas | `@xyflow/svelte` v1.5.x (Svelte Flow) |
 | Layout engines | `@dagrejs/dagre` v2 (sync) + `elkjs` (async, ELK layered) |
 | YAML parsing | `js-yaml` v4 |
+| Code editor | CodeMirror 6 (`@codemirror/state`, `@codemirror/view`, `@codemirror/lang-yaml`, `@codemirror/theme-one-dark`, `@codemirror/commands`) |
 | Language | TypeScript 5, strict mode |
 | Build tool | Vite 7 |
 | Adapter | `@sveltejs/adapter-static` (static SPA, GitHub Pages) |
@@ -61,11 +62,14 @@ plugin-link/
         ├── linkml.ts             # schema parser (YAML + JSON), loadDefaultSchema(), loadDomainConfig()
         ├── layout.ts             # async buildGraph(schema, collapsed, LayoutOptions) — dagre + elk
         └── components/
+            ├── CustomControls.svelte  # bottom-left controls: zoom/fit/lock + layout buttons (2×4 grid)
+            ├── DomainEditor.svelte    # right panel: domain color-picker form (live updates)
             ├── DomainLegend.svelte    # left sidebar: domain color swatches + slot icon key
             ├── FlowController.svelte  # useSvelteFlow() context — pan/highlight/fitView
+            ├── SchemaEditor.svelte    # right panel: CodeMirror 6 YAML editor (500ms debounce)
+            ├── SchemaUploader.svelte  # top-bar button + drag-and-drop file picker
             ├── SearchBar.svelte       # top-bar search with keyboard nav and canvas pan
-            ├── TableNode.svelte       # custom node: collapsible table card with domain header color
-            └── SchemaUploader.svelte  # top-bar button + drag-and-drop file picker
+            └── TableNode.svelte       # custom node: collapsible table card with domain header color
 ```
 
 ---
@@ -75,6 +79,7 @@ plugin-link/
 ```
 static/omop_cdm.yaml  ──fetch──▶  parseLinkMLSchema()  ──▶  NormalizedSchema
 uploaded file         ──upload──▶  parseLinkMLSchema()  ──▶  NormalizedSchema
+YAML editor (live)    ──debounce─▶  parseLinkMLSchema()  ──▶  NormalizedSchema
                                                                │
                                                         buildGraph(schema, collapsed)
                                                                │
@@ -83,9 +88,10 @@ uploaded file         ──upload──▶  parseLinkMLSchema()  ──▶  Nor
 static/domain-config.yaml  ──fetch──▶  loadDomainConfig()  ──▶  Map<string, DomainInfo>
                                                                         │
                                               setContext('domainConfig', domainCtx)  ──▶  TableNode + DomainLegend
+Domain editor (live)   ──onchange──▶  domainCtx.map = new Map(...)  ──▶  TableNode + DomainLegend
 ```
 
-1. On mount, `+page.svelte` fetches `omop_cdm.yaml` and calls `parseLinkMLSchema()`.
+1. On mount, `+page.svelte` fetches `omop_cdm.yaml` raw text, stores it in `schemaYamlText`, and calls `parseLinkMLSchema()`.
 2. The `NormalizedSchema` is stored in `$state`.
 3. A `$effect` calls `buildGraph()` whenever `schema` or `collapsed` changes, writing new `Node[]` / `Edge[]` into `$state.raw`.
 4. Svelte Flow re-renders reactively.
@@ -256,7 +262,19 @@ Node heights are estimated from slot count: `header (36px) + rows × 24px + 8px 
 
 ### Edges
 
-All nodes and edges use a single neutral color: `#475569` (slate-600). Required FK edges get `stroke-width: 2`; optional get `1.5`. Edge IDs are `source--slotName--target`, with a counter suffix for duplicates. Isolated nodes (no layout position) are skipped silently.
+Two kinds of edges are produced, discriminated by the `kind` field on `ErdEdgeData`:
+
+- **FK edges** (`kind: 'fk'`): inferred from `range:` fields that resolve to another class in the schema. Color: `#475569` (slate-600), solid. Required edges get `stroke-width: 2`; optional get `1.5`.
+- **ETL edges** (`kind: 'etl'`): inferred from `exact_mappings` CURIEs on slots. Color: `#6366f1` (indigo-500), dashed (`stroke-dasharray: 5,3`), `stroke-width: 1.5`, with an indigo label.
+
+ETL edge extraction is done by `collectEtlEdges(schema)` in `layout.ts`:
+- Parses CURIEs like `omop_cdm54:VisitOccurrence.visit_occurrence_id`
+- Extracts target class: `colonIdx = mapping.lastIndexOf(':')`, `dotIdx = mapping.indexOf('.', colonIdx)`, `targetClass = mapping.slice(colonIdx + 1, dotIdx)`
+- Silently skips targets not present in the schema (cross-schema references)
+
+Internal union types `FkEdge`, `EtlEdge`, `AnyEdge` carry a `kind` discriminant. `buildSvelteEdges(allEdges: AnyEdge[])` converts them to Svelte Flow `Edge` objects with the appropriate styles. Both `buildGraphDagre` and `buildGraphElk` merge FK and ETL edges before layout so the layout engine accounts for all connections.
+
+Edge IDs are `source--slotName--target` for FK edges, with a counter suffix for duplicates. Isolated nodes (no layout position) are skipped silently.
 
 The `domain` field from `ErdClass` is propagated into `ErdNodeData` by both the Dagre and ELK build paths so that `TableNode` and `DomainLegend` can access it without querying the schema separately.
 
@@ -288,8 +306,61 @@ Props:
 Two sections:
 1. **Domains** — one row per active domain (colored `14×14` swatch + label). The `default` entry is excluded from this list.
 2. **Legend** — slot row icon key: PK badge (amber), FK badge (slate), bold name = required, plain name = optional, indigo italic = ETL mapping.
+3. **Edges** — ETL edge row: dashed indigo swatch (`border-top: 2px dashed #6366f1`) + "ETL edge" label.
 
 The component reads `domainCtx` from Svelte context (same reactive wrapper set by `+page.svelte`), so it updates reactively once `loadDomainConfig()` resolves.
+
+---
+
+## Custom controls (`src/lib/components/CustomControls.svelte`)
+
+Replaces the built-in `<Controls>` component from `@xyflow/svelte` entirely.
+
+- Uses `useSvelteFlow()` for `zoomIn`, `zoomOut`, `fitView` (must be inside `<SvelteFlow>` subtree).
+- Uses `useStore()` directly to toggle the lock state (`store.nodesDraggable`, `store.nodesConnectable`, `store.elementsSelectable`).
+- 2-column CSS grid layout: Row 1: zoom+/zoom−, Row 2: fit view/lock toggle, Rows 3–4: D→/D↓/E→/E↓ layout buttons.
+- Inline SVG icons mirrored from the `@xyflow/svelte` built-in Controls source.
+- Positioned absolutely at `bottom: 24px; left: 12px`, matching the original Controls placement.
+
+Props:
+- `layoutOptions: LayoutOptions` — current active layout to highlight the active button
+- `layoutLoading: boolean` — shows a spinner on the active layout button while running
+- `onlayoutselect: (opts: LayoutOptions) => void` — called when user clicks a layout button
+
+---
+
+## Schema editor (`src/lib/components/SchemaEditor.svelte`)
+
+An in-browser CodeMirror 6 YAML editor rendered as a 420px right slide-in panel.
+
+- Extensions: `yaml()` language, `oneDark` theme, `defaultKeymap`, `historyKeymap`, `history()`, `EditorView.lineWrapping`.
+- 500ms debounce on `EditorView.updateListener`; calls `parseLinkMLSchema()` on each debounced keystroke.
+- On parse error: shows a red error bar with the message; does **not** call `onchange` (canvas unchanged).
+- On valid parse: fires `onchange(text, parsedSchema)`.
+- A `$effect` syncs editor content when the `yamlText` prop changes externally (e.g. new schema loaded via file upload).
+- Editor is destroyed in `onDestroy`.
+
+Props:
+- `yamlText: string` — current YAML content (controlled from parent)
+- `onchange: (text: string, schema: NormalizedSchema) => void` — called on each valid parse
+- `onclose: () => void` — called when the × button is clicked
+
+---
+
+## Domain editor (`src/lib/components/DomainEditor.svelte`)
+
+A 360px right slide-in panel for editing domain colors and labels live.
+
+- Grid layout: `grid-template-columns: 20px 1fr 1fr 28px 28px` — delete / name / label / bg color / text color.
+- Color pickers: native `<input type="color">` hidden behind a visible swatch `div`; `oninput` for live updates without requiring a confirm step.
+- Add row button (dashed border); delete button per row; the `default` entry's delete button is disabled.
+- A `$effect` re-syncs local `rows` when the `domains` prop changes (e.g. new schema loaded).
+- Fires `onchange(rows)` immediately on every change (no debounce); parent updates `domainCtx.map`.
+
+Props:
+- `domains: DomainInfo[]` — current domain list (derived from `domainCtx.map` in parent)
+- `onchange: (domains: DomainInfo[]) => void` — called on every edit
+- `onclose: () => void` — called when the × button is clicked
 
 ---
 
@@ -305,12 +376,16 @@ Uses Svelte 5 runes throughout:
 | `$state` | `layoutOptions` | Active `LayoutOptions` (engine + direction) |
 | `$state` | `fitViewTrigger` | Counter incremented after layout to trigger `fitView` |
 | `$state` | `domainCtx` | `{ map: Map<string, DomainInfo> \| null }` — reactive wrapper set as context |
+| `$state` | `schemaEditorOpen` | Boolean — controls Schema editor panel visibility |
+| `$state` | `domainEditorOpen` | Boolean — controls Domain editor panel visibility |
+| `$state` | `schemaYamlText` | Raw YAML string for the Schema editor (kept in sync with loaded schema) |
 | `$state.raw` | `nodes` | `Node[]` — raw avoids deep reactivity overhead |
 | `$state.raw` | `edges` | `Edge[]` — raw avoids deep reactivity overhead |
 | `$effect` | — | Rebuilds `nodes`/`edges` (async IIFE with cancellation flag) when `schema`, `collapsed`, or `layoutOptions` changes |
 | `$derived` | `classCount`, `schemaName`, `tableCount` | Computed display values |
 | `$derived` | `activeDomainNames` | Unique domain strings present in current `nodes` |
 | `$derived` | `hasDomains` | `true` when `activeDomainNames.length > 0` — gates `DomainLegend` visibility |
+| `$derived` | `domainList` | `DomainInfo[]` array derived from `domainCtx.map` — passed to `DomainEditor` |
 
 `$state.raw` is used for `nodes` and `edges` per the [Svelte Flow performance recommendation](https://github.com/sveltejs/svelte/issues/11851) — deep reactivity on large node arrays causes noticeable lag.
 

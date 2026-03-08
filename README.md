@@ -25,10 +25,13 @@ npm run preview
 ## Features
 
 - Drag-and-drop upload of any `.yaml` / `.yml` LinkML schema
+- **In-browser Schema YAML editor** — live CodeMirror 6 editor with syntax highlighting; edits are applied to the canvas with a 500ms debounce
+- **In-browser Domain color editor** — edit domain labels and colors live without touching any files
 - Auto-layout via [Dagre](https://github.com/dagrejs/dagre) or [ELK](https://eclipse.dev/elk/) (layered algorithm), switchable at runtime
-- Left-side **domain legend** sidebar — shown automatically when the schema has domain-annotated classes; lists color swatches and slot row icon key
+- Left-side **domain legend** sidebar — shown automatically when the schema has domain-annotated classes; lists color swatches, slot row icon key, and edge type legend
 - **Domain-colored node headers** — each class's header is colored by its domain annotation (configured in `static/domain-config.yaml`)
 - **ETL mapping badges** — slots with `exact_mappings` show the target column as an indigo italic badge, with the full mapping list on hover
+- **ETL edges** — dashed indigo arrows drawn between classes connected via `exact_mappings` (e.g. HiX → OMOP)
 - Collapsible table nodes (click the header)
 - Top-bar search with keyboard navigation and canvas pan-to-node
 - MiniMap with domain-aware node coloring
@@ -100,6 +103,15 @@ attributes:
 
 The first mapping is shown as an indigo italic badge in the slot row (prefix stripped). Hover over it to see all mappings.
 
+When both source and target classes are present in the schema, a **dashed indigo ETL edge** is drawn between them on the canvas.
+
+## In-browser editors
+
+Two slide-in panels are accessible from the top bar:
+
+- **`</> Schema`** — opens a CodeMirror 6 YAML editor pre-loaded with the current schema. Edits are parsed live (500ms debounce) and applied to the canvas. Parse errors are shown in a red bar; the canvas is not updated until the YAML is valid.
+- **`◎ Domains`** — opens a domain color-picker form. Each row has a name, label, background color, and text color. Changes are applied to all node headers and the legend immediately.
+
 ## Included schemas
 
 | File | Description |
@@ -118,8 +130,11 @@ src/
     linkml.ts             # YAML parser, loadDefaultSchema(), loadDomainConfig()
     layout.ts             # buildGraph(schema, collapsed, layoutOptions) → nodes/edges
     components/
-      DomainLegend.svelte # left sidebar: domain swatches + slot icon key
-      TableNode.svelte    # custom node: domain-colored header, exact_mappings badge
+      CustomControls.svelte  # zoom/fit/lock + layout buttons (replaces built-in Controls)
+      DomainEditor.svelte    # right panel: domain color-picker form
+      DomainLegend.svelte    # left sidebar: domain swatches + slot icon key + edge legend
+      SchemaEditor.svelte    # right panel: CodeMirror 6 YAML editor
+      TableNode.svelte       # custom node: domain-colored header, exact_mappings badge
       SchemaUploader.svelte
       SearchBar.svelte
       FlowController.svelte
