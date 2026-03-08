@@ -81,6 +81,12 @@
     // Delay so click on result fires before dropdown closes
     setTimeout(() => { query = ''; }, 150);
   }
+
+  // Exposed so the parent can focus the input (e.g. via Cmd-K shortcut)
+  export function focus() {
+    inputEl?.focus();
+    inputEl?.select();
+  }
 </script>
 
 <div class="search-wrap">
@@ -99,6 +105,7 @@
       aria-label="Search classes and slots"
       aria-autocomplete="list"
     />
+    <kbd class="kbd-hint">⌘K</kbd>
   </div>
 
   {#if open && results.length > 0}
@@ -135,7 +142,7 @@
     background: #f8fafc;
     border: 1px solid #cbd5e1;
     border-radius: 6px;
-    padding: 0 10px;
+    padding: 0 8px 0 10px;
     gap: 6px;
     height: 34px;
     transition: border-color 0.15s;
@@ -144,6 +151,10 @@
   .search-input-row:focus-within {
     border-color: #475569;
     background: #fff;
+  }
+
+  .search-input-row:focus-within .kbd-hint {
+    display: none;
   }
 
   .search-icon {
@@ -175,6 +186,22 @@
   /* Remove browser default search cancel button */
   input[type='search']::-webkit-search-cancel-button {
     -webkit-appearance: none;
+  }
+
+  .kbd-hint {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 5px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: ui-monospace, monospace;
+    color: #94a3b8;
+    background: #f1f5f9;
+    white-space: nowrap;
+    flex-shrink: 0;
+    user-select: none;
+    pointer-events: none;
   }
 
   .results {

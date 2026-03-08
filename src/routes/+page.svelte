@@ -153,6 +153,17 @@
     panTarget = classId;
   }
 
+  // Reference to SearchBar component for programmatic focus
+  let searchBar: { focus: () => void } | undefined = $state();
+
+  // Global Cmd-K / Ctrl-K shortcut to activate the search bar
+  function handleGlobalKeydown(e: KeyboardEvent) {
+    if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      searchBar?.focus();
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Layout button helpers
   // ---------------------------------------------------------------------------
@@ -189,6 +200,8 @@
   );
 </script>
 
+<svelte:window onkeydown={handleGlobalKeydown} />
+
 <div class="app">
   <!-- Domain legend sidebar — only shown when schema has domain-annotated classes -->
   {#if schema && hasDomains}
@@ -212,9 +225,12 @@
           <span class="load-error">⚠ {loadError}</span>
         {/if}
       </div>
-      <div class="topbar-right">
-        <SearchBar {schema} onselect={handleSearchSelect} />
 
+      <div class="topbar-center">
+        <SearchBar bind:this={searchBar} {schema} onselect={handleSearchSelect} />
+      </div>
+
+      <div class="topbar-right">
         <!-- Schema editor toggle -->
         <button
           class="editor-btn"
@@ -351,6 +367,30 @@
     border-bottom: 1px solid #e5e7eb;
     z-index: 20;
     gap: 12px;
+    flex-shrink: 0;
+  }
+
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .topbar-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+  }
+
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    justify-content: flex-end;
     flex-shrink: 0;
   }
 
