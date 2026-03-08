@@ -14,6 +14,7 @@
   import SchemaUploader from '$lib/components/SchemaUploader.svelte';
   import SearchBar from '$lib/components/SearchBar.svelte';
   import FlowController from '$lib/components/FlowController.svelte';
+  import DomainLegend from '$lib/components/DomainLegend.svelte';
 
   import { loadDefaultSchema, loadDomainConfig } from '$lib/linkml';
   import { buildGraph } from '$lib/layout';
@@ -143,9 +144,27 @@
   // ---------------------------------------------------------------------------
   const schemaName = $derived(schema?.name ?? 'Loading…');
   const tableCount = $derived(nodes.filter((n) => n.type === 'table').length);
+
+  // Collect unique domain names present in current nodes (for DomainLegend).
+  // Cast via unknown because Node data is typed as Record<string,unknown>.
+  const activeDomainNames = $derived(
+    [...new Set(
+      nodes
+        .map((n) => (n.data as unknown as { domain?: string }).domain)
+        .filter((d): d is string => typeof d === 'string')
+    )]
+  );
+
+  // Only show the legend when at least one node has a domain annotation.
+  const hasDomains = $derived(activeDomainNames.length > 0);
 </script>
 
 <div class="app">
+  <!-- Domain legend sidebar — only shown when schema has domain-annotated classes -->
+  {#if schema && hasDomains}
+    <DomainLegend {activeDomainNames} />
+  {/if}
+
   <div class="canvas-wrap">
     <!-- Top bar -->
     <div class="topbar">
@@ -207,7 +226,17 @@
             {/each}
           {/snippet}
         </Controls>
-        <MiniMap nodeColor={() => '#475569'} nodeStrokeWidth={3} zoomable pannable />
+        <MiniMap
+          nodeColor={(n) => {
+            const domain = (n.data as unknown as { domain?: string }).domain;
+            const map = domainCtx.map;
+            if (!domain || !map) return '#475569';
+            return map.get(domain)?.color ?? map.get('default')?.color ?? '#475569';
+          }}
+          nodeStrokeWidth={3}
+          zoomable
+          pannable
+        />
       </SvelteFlow>
     {:else if schema && nodes.length === 0}
       <div class="empty-state">

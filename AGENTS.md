@@ -46,6 +46,10 @@ plugin-link/
 ├── vite.config.ts                # sveltekit() plugin + elkjs web-worker externals
 ├── static/
 │   ├── omop_cdm.yaml             # default schema (OMOP CDM v5.4, fully merged, 13 879 lines)
+│   ├── sein.yaml                 # SEIN merged schema (13 HiX staging + 17 OMOP classes, 30 total)
+│   ├── hix.yaml                  # HiX staging classes only (13 classes, raw LinkML)
+│   ├── sein-omop.yaml            # OMOP CDM subset used by SEIN (17 classes, raw LinkML)
+│   ├── domain-config.yaml        # domain name → color/label config (loaded at runtime)
 │   └── logo.png                  # favicon
 └── src/
     ├── routes/
@@ -53,13 +57,14 @@ plugin-link/
     │   ├── +layout.svelte        # Svelte Flow CSS import, favicon, global box-sizing/overflow
     │   └── +page.svelte          # main app: state, canvas wiring, top bar, layout toolbar
     └── lib/
-        ├── types.ts              # all shared TypeScript interfaces (incl. LayoutOptions, highlighted)
-        ├── linkml.ts             # schema parser (YAML + JSON) and loadDefaultSchema()
+        ├── types.ts              # all shared TypeScript interfaces
+        ├── linkml.ts             # schema parser (YAML + JSON), loadDefaultSchema(), loadDomainConfig()
         ├── layout.ts             # async buildGraph(schema, collapsed, LayoutOptions) — dagre + elk
         └── components/
+            ├── DomainLegend.svelte    # left sidebar: domain color swatches + slot icon key
             ├── FlowController.svelte  # useSvelteFlow() context — pan/highlight/fitView
             ├── SearchBar.svelte       # top-bar search with keyboard nav and canvas pan
-            ├── TableNode.svelte       # custom node: collapsible table card with amber highlight
+            ├── TableNode.svelte       # custom node: collapsible table card with domain header color
             └── SchemaUploader.svelte  # top-bar button + drag-and-drop file picker
 ```
 
@@ -74,12 +79,18 @@ uploaded file         ──upload──▶  parseLinkMLSchema()  ──▶  Nor
                                                         buildGraph(schema, collapsed)
                                                                │
                                                         Node[] + Edge[]  ──▶  SvelteFlow
+
+static/domain-config.yaml  ──fetch──▶  loadDomainConfig()  ──▶  Map<string, DomainInfo>
+                                                                        │
+                                              setContext('domainConfig', domainCtx)  ──▶  TableNode + DomainLegend
 ```
 
 1. On mount, `+page.svelte` fetches `omop_cdm.yaml` and calls `parseLinkMLSchema()`.
 2. The `NormalizedSchema` is stored in `$state`.
 3. A `$effect` calls `buildGraph()` whenever `schema` or `collapsed` changes, writing new `Node[]` / `Edge[]` into `$state.raw`.
 4. Svelte Flow re-renders reactively.
+5. In parallel on mount, `loadDomainConfig()` fetches `domain-config.yaml` and populates `domainCtx.map`.
+6. `TableNode` and `DomainLegend` read `domainCtx` from Svelte context reactively.
 
 ---
 
@@ -137,6 +148,34 @@ A slot is classified as a foreign key (`is_fk: true`) when all three hold:
 
 Cross-schema FK targets (range names a class not present in the file) are silently skipped — no ghost nodes.
 
+### Domain annotations
+
+Classes may carry a `domain` annotation:
+
+```yaml
+classes:
+  person:
+    annotations:
+      domain:
+        tag: domain
+        value: clinical
+```
+
+`parseRawLinkML()` reads `classDef.annotations?.domain?.value` and stores it as `ErdClass.domain`. The value must match a `name` key in `domain-config.yaml` to receive a color; unknown domain values fall back to the `default` entry.
+
+### exact_mappings (ETL mappings)
+
+Slots may carry `exact_mappings` listing cross-schema column references:
+
+```yaml
+attributes:
+  gender:
+    exact_mappings:
+      - omop_cdm54:Person.gender_source_value
+```
+
+The parser reads this into `ErdSlot.exact_mappings: string[]` for both Path A and Path B. `TableNode` renders the first entry as an indigo italic badge (prefix stripped), with the full list on hover.
+
 ### Normalized JSON (legacy)
 
 If the parsed object is already in the normalized `NormalizedSchema` shape (produced by the Python `SchemaView` export script in `omop-link`), it is passed through as-is without re-parsing.
@@ -150,6 +189,53 @@ If the parsed object is already in the normalized `NormalizedSchema` shape (prod
 - If no signal is found across all classes (all slot-less) → conservatively treat as raw LinkML
 
 Scanning all classes (not just the first) avoids misidentification when the first class happens to have no slots.
+
+---
+
+## Domain configuration (`static/domain-config.yaml`)
+
+Domain colors and labels are defined in `static/domain-config.yaml`, **not hardcoded in TypeScript**. This means new domains can be added by editing YAML only.
+
+```yaml
+domains:
+  - name: clinical
+    label: Clinical
+    color: "#2563eb"
+    text_color: "#ffffff"
+  - name: default
+    label: Other
+    color: "#475569"
+    text_color: "#ffffff"
+```
+
+Each entry maps to the `DomainInfo` interface (`name`, `label`, `color`, `text_color`). The `default` entry is used as a fallback for classes whose domain value does not match any named entry; it is excluded from the `DomainLegend` swatch list.
+
+`loadDomainConfig()` in `linkml.ts` fetches the file at runtime and returns a `Map<string, DomainInfo>` keyed by `name`.
+
+### Context pattern
+
+`+page.svelte` sets a reactive `$state` wrapper as Svelte context **synchronously at init time** so that child components (`TableNode`, `DomainLegend`) can call `getContext` during their own synchronous initialization:
+
+```typescript
+// +page.svelte — at module script top level (NOT inside onMount)
+const domainCtx = $state<{ map: Map<string, DomainInfo> | null }>({ map: null });
+setContext('domainConfig', domainCtx);
+
+// Then in onMount, populate the map after the async fetch:
+onMount(() => {
+  loadDomainConfig().then((map) => { domainCtx.map = map; });
+});
+```
+
+Child components read the context and derive colors reactively:
+
+```typescript
+// TableNode.svelte / DomainLegend.svelte
+const domainCtx = getContext<{ map: Map<string, DomainInfo> | null }>('domainConfig');
+const headerColor = $derived(domainCtx?.map?.get(rawData.domain)?.color ?? '#475569');
+```
+
+Because `domainCtx` is a `$state` object (not a plain value), mutations to `domainCtx.map` are visible reactively in all child `$derived` expressions without requiring a new `setContext` call.
 
 ---
 
@@ -172,16 +258,38 @@ Node heights are estimated from slot count: `header (36px) + rows × 24px + 8px 
 
 All nodes and edges use a single neutral color: `#475569` (slate-600). Required FK edges get `stroke-width: 2`; optional get `1.5`. Edge IDs are `source--slotName--target`, with a counter suffix for duplicates. Isolated nodes (no layout position) are skipped silently.
 
+The `domain` field from `ErdClass` is propagated into `ErdNodeData` by both the Dagre and ELK build paths so that `TableNode` and `DomainLegend` can access it without querying the schema separately.
+
 ---
 
 ## Custom node (`src/lib/components/TableNode.svelte`)
 
-- Renders as a 260px-wide card with a slate-colored header and collapsible slot rows.
+- Renders as a 260px-wide card with a **domain-colored header** (falls back to slate-600 for undomain-annotated classes).
+- Header color and text color are `$derived` from `domainCtx.map` read via `getContext('domainConfig')`. Updates reactively once the domain config fetch resolves.
 - Click the header to toggle collapse.
-- Each slot row shows a badge (`PK` in amber, `FK` in slate, blank for plain slots), the display name (bold if required), and the range type in italic gray.
+- Each slot row shows:
+  - A badge: `PK` (amber) for identifiers, `FK` (slate) for foreign keys, blank for plain slots
+  - The display name (bold if required)
+  - The range type in italic gray
+  - An **indigo italic ETL mapping badge** showing `exact_mappings[0]` with the prefix stripped (e.g. `omop_cdm54:Person.person_source_value` → `Person.person_source_value`). The full list of mappings appears as a tooltip on hover.
 - Rows beyond 20 are hidden with a "+N more…" overflow indicator.
 - Highlighted nodes (panned-to from search) show a brief amber glow for 1.5s via the `highlighted` flag on `ErdNodeData`.
 - Svelte Flow v1 requires `Node<Data>` where `Data extends Record<string, unknown>`. Since `ErdNodeData` contains `slots: ErdSlot[]` (not assignable to `Record<string, unknown>` under strict mode), `data` is cast via `as unknown as ErdNodeData` in `layout.ts`. In `TableNode.svelte`, the prop is re-derived reactively with `$derived(data as unknown as ErdNodeData)` to avoid the `state_referenced_locally` Svelte 5 lint warning.
+
+---
+
+## Domain legend (`src/lib/components/DomainLegend.svelte`)
+
+A left-side sidebar (`170px` wide, `border-right: 1px solid #e5e7eb`) rendered only when the loaded schema has at least one domain-annotated class (`hasDomains` derived in `+page.svelte`).
+
+Props:
+- `activeDomainNames: string[]` — the unique domain names found in the current `nodes` array, derived in `+page.svelte`.
+
+Two sections:
+1. **Domains** — one row per active domain (colored `14×14` swatch + label). The `default` entry is excluded from this list.
+2. **Legend** — slot row icon key: PK badge (amber), FK badge (slate), bold name = required, plain name = optional, indigo italic = ETL mapping.
+
+The component reads `domainCtx` from Svelte context (same reactive wrapper set by `+page.svelte`), so it updates reactively once `loadDomainConfig()` resolves.
 
 ---
 
@@ -196,10 +304,13 @@ Uses Svelte 5 runes throughout:
 | `$state` | `collapsed` | `Set<string>` of collapsed node IDs |
 | `$state` | `layoutOptions` | Active `LayoutOptions` (engine + direction) |
 | `$state` | `fitViewTrigger` | Counter incremented after layout to trigger `fitView` |
+| `$state` | `domainCtx` | `{ map: Map<string, DomainInfo> \| null }` — reactive wrapper set as context |
 | `$state.raw` | `nodes` | `Node[]` — raw avoids deep reactivity overhead |
 | `$state.raw` | `edges` | `Edge[]` — raw avoids deep reactivity overhead |
 | `$effect` | — | Rebuilds `nodes`/`edges` (async IIFE with cancellation flag) when `schema`, `collapsed`, or `layoutOptions` changes |
 | `$derived` | `classCount`, `schemaName`, `tableCount` | Computed display values |
+| `$derived` | `activeDomainNames` | Unique domain strings present in current `nodes` |
+| `$derived` | `hasDomains` | `true` when `activeDomainNames.length > 0` — gates `DomainLegend` visibility |
 
 `$state.raw` is used for `nodes` and `edges` per the [Svelte Flow performance recommendation](https://github.com/sveltejs/svelte/issues/11851) — deep reactivity on large node arrays causes noticeable lag.
 
@@ -219,9 +330,10 @@ Uses Svelte 5 runes throughout:
 ## Known pitfalls
 
 - **`useSvelteFlow()` must be called inside a child of `<SvelteFlow>`** — calling it at page-level script scope crashes the app to a blank page. It lives in `FlowController.svelte`.
+- **`setContext` must be called synchronously at component init** — calling it inside `onMount` or inside a `.then()` callback means child components have already called `getContext` and received `undefined`. Always declare the `$state` holder and call `setContext` at the top level of the `<script>` block.
 - **elkjs `web-worker`**: elkjs conditionally `require('web-worker')` in Node environments; in the browser it falls back gracefully but causes build-time errors without the two `vite.config.ts` workarounds above.
 - **`labelBgStyle`** is not a valid property on the `@xyflow/svelte` `Edge` type — do not use it.
-- **LSP stale errors**: LSP may show stale type errors in `.svelte` files (e.g. `LayoutOptions` not found, `buildGraph` wrong arg count). These are false positives — `npm run build` is the ground truth.
+- **LSP stale errors**: LSP may show stale type errors in `.svelte` files (e.g. `LayoutOptions` not found, `buildGraph` wrong arg count, `DomainInfo` not exported). These are false positives — `npm run build` is the ground truth.
 
 ---
 
