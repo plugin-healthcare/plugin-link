@@ -76,6 +76,7 @@ export interface ErdNodeData {
   description: string;
   slots: ErdSlot[];
   collapsed: boolean;
+  highlighted?: boolean;
 }
 
 export interface ErdEdgeData {

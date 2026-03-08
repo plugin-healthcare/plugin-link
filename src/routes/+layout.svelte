@@ -1,13 +1,13 @@
 <script lang="ts">
   import '@xyflow/svelte/dist/style.css';
-  import favicon from '$lib/assets/favicon.svg';
+  import { base } from '$app/paths';
 
   let { children } = $props();
 </script>
 
 <svelte:head>
   <title>LinkML ERD Viewer</title>
-  <link rel="icon" href={favicon} />
+  <link rel="icon" type="image/png" href="{base}/logo.png" />
 </svelte:head>
 
 {@render children()}

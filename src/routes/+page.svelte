@@ -5,12 +5,14 @@
     Background,
     Controls,
     MiniMap,
+    useSvelteFlow,
     type Node,
     type Edge,
   } from '@xyflow/svelte';
 
   import TableNode from '$lib/components/TableNode.svelte';
   import SchemaUploader from '$lib/components/SchemaUploader.svelte';
+  import SearchBar from '$lib/components/SearchBar.svelte';
 
   import { loadDefaultSchema } from '$lib/linkml';
   import { buildGraph } from '$lib/layout';
@@ -35,6 +37,9 @@
   // Svelte Flow reactive nodes/edges (use $state.raw for performance)
   let nodes = $state.raw<Node[]>([]);
   let edges = $state.raw<Edge[]>([]);
+
+  // Svelte Flow instance helpers (must be called inside SvelteFlow context)
+  const { setCenter, getNode } = useSvelteFlow();
 
   // ---------------------------------------------------------------------------
   // Derived: rebuild graph whenever schema or collapsed set changes
@@ -67,9 +72,35 @@
   onMount(loadDefault);
 
   // ---------------------------------------------------------------------------
+  // Search: pan to node and briefly highlight it
+  // ---------------------------------------------------------------------------
+  function handleSearchSelect(classId: string) {
+    const node = getNode(classId);
+    if (!node) return;
+
+    const x = (node.position.x ?? 0) + ((node.measured?.width ?? 260) / 2);
+    const y = (node.position.y ?? 0) + ((node.measured?.height ?? 36) / 2);
+
+    setCenter(x, y, { zoom: 1.2, duration: 500 });
+
+    // Set highlighted flag on the matching node, clear after 1.5 s
+    nodes = nodes.map((n) =>
+      n.id === classId
+        ? { ...n, data: { ...(n.data as unknown as ErdNodeData), highlighted: true } as unknown as Record<string, unknown> }
+        : n
+    );
+    setTimeout(() => {
+      nodes = nodes.map((n) =>
+        n.id === classId
+          ? { ...n, data: { ...(n.data as unknown as ErdNodeData), highlighted: false } as unknown as Record<string, unknown> }
+          : n
+      );
+    }, 1500);
+  }
+
+  // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
-  const classCount = $derived(schema ? Object.keys(schema.classes).length : 0);
   const schemaName = $derived(schema?.name ?? 'Loading…');
   const tableCount = $derived(nodes.filter((n) => n.type === 'table').length);
 </script>
@@ -90,6 +121,7 @@
         {/if}
       </div>
       <div class="topbar-right">
+        <SearchBar {schema} onselect={handleSearchSelect} />
         <div class="uploader-wrap">
           <SchemaUploader onschema={handleUploadedSchema} onreset={loadDefault} />
         </div>

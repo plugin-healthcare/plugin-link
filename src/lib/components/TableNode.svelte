@@ -51,7 +51,7 @@
 <Handle type="target" position={Position.Left} />
 <Handle type="source" position={Position.Right} />
 
-<div class="table-node" class:collapsed>
+<div class="table-node" class:collapsed class:highlighted={rawData.highlighted}>
   <!-- Header -->
   <button
     class="header"
@@ -104,6 +104,12 @@
 
   .table-node.collapsed {
     border-color: #94a3b8;
+  }
+
+  .table-node.highlighted {
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.35), 0 1px 4px rgba(0, 0, 0, 0.08);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
   }
 
   /* Header */
