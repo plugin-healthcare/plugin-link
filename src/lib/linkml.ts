@@ -54,30 +54,42 @@ const PRIMITIVE_RANGES = new Set([
  * Check whether the input looks like our normalized JSON export.
  *
  * Raw LinkML YAML also has a top-level `classes` object, so we must be more
- * specific: in the normalized format each class has a `slots` array of
- * ErdSlot objects (with a `slot_name` string field), whereas raw LinkML has
- * `slots` as an array of plain strings (slot reference names).
+ * specific. We scan every class entry looking for a discriminating signal:
+ *
+ * - A class with `slot_usage` → definitely raw LinkML
+ * - A class whose `slots` is a non-empty string array → definitely raw LinkML
+ * - A class whose `slots` is a non-empty object array → definitely normalized JSON
+ *
+ * Classes with empty/absent slots carry no signal and are skipped. If every
+ * class is slot-less (no signal found) we conservatively return false so the
+ * raw parser handles it — this is safe because the raw parser tolerates
+ * slot-less classes gracefully.
  */
 function isNormalizedJson(raw: unknown): raw is NormalizedSchema {
   if (typeof raw !== 'object' || raw === null) return false;
   const r = raw as Record<string, unknown>;
   if (typeof r.classes !== 'object' || r.classes === null) return false;
 
-  // Check the first class entry: if its slots array contains objects with a
-  // `slot_name` property it is our normalized format; if it contains strings
-  // (or the class has a raw `slot_usage` key) it is raw LinkML YAML.
   const classes = r.classes as Record<string, unknown>;
-  const firstClass = Object.values(classes)[0];
-  if (typeof firstClass !== 'object' || firstClass === null) return false;
-  const fc = firstClass as Record<string, unknown>;
 
-  // Raw LinkML classes have slot_usage or slots as string[]
-  if ('slot_usage' in fc) return false;
-  const slots = fc.slots;
-  if (Array.isArray(slots) && slots.length > 0 && typeof slots[0] === 'string') return false;
-  // Normalized classes have slots as ErdSlot[] — objects with slot_name
-  if (Array.isArray(slots) && slots.length > 0 && typeof slots[0] === 'object') return true;
-  // Empty slots array or no slots — could be either; fall through to raw parser (safe)
+  for (const classEntry of Object.values(classes)) {
+    if (typeof classEntry !== 'object' || classEntry === null) continue;
+    const fc = classEntry as Record<string, unknown>;
+
+    // Definitive raw-LinkML signal: presence of slot_usage
+    if ('slot_usage' in fc) return false;
+
+    const slots = fc.slots;
+    if (!Array.isArray(slots) || slots.length === 0) continue; // no signal, keep scanning
+
+    // Definitive raw-LinkML signal: slots is a string array
+    if (typeof slots[0] === 'string') return false;
+
+    // Definitive normalized signal: slots is an object array
+    if (typeof slots[0] === 'object') return true;
+  }
+
+  // No discriminating signal found (all classes are slot-less) — treat as raw
   return false;
 }
 

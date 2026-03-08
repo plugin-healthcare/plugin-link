@@ -136,13 +136,15 @@ Cross-schema FK targets (range names a class not present in the file) are silent
 
 If the parsed object is already in the normalized `NormalizedSchema` shape (produced by the Python `SchemaView` export script in `omop-link`), it is passed through as-is without re-parsing.
 
-**Important**: raw LinkML YAML also has a top-level `classes` object, so a simple presence check is not sufficient to distinguish the two formats. `isNormalizedJson()` inspects the first class entry:
+**Important**: raw LinkML YAML also has a top-level `classes` object, so a simple presence check is not sufficient to distinguish the two formats. `isNormalizedJson()` scans all class entries looking for a discriminating signal:
 
-- If the class has a `slot_usage` key → raw LinkML, route to `parseRawLinkML()`
-- If `slots` is a string array → raw LinkML (slot reference names), route to `parseRawLinkML()`
-- If `slots` is an object array with a `slot_name` field → normalized JSON, pass through
+- If any class has a `slot_usage` key → raw LinkML, route to `parseRawLinkML()`
+- If any class has `slots` as a non-empty string array → raw LinkML (slot reference names), route to `parseRawLinkML()`
+- If any class has `slots` as a non-empty object array → normalized JSON, pass through
+- Classes with empty/absent `slots` carry no signal and are skipped
+- If no signal is found across all classes (all slot-less) → conservatively treat as raw LinkML
 
-This distinction is critical: passing raw YAML through as-is leaves `slots` as `string[]` instead of `ErdSlot[]`, causing `buildGraph` to produce zero nodes.
+Scanning all classes (not just the first) avoids misidentification when the first class happens to have no slots.
 
 ---
 
