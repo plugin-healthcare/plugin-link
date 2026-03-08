@@ -134,7 +134,15 @@ Cross-schema FK targets (range names a class not present in the file) are silent
 
 ### Normalized JSON (legacy)
 
-If the parsed object already has a top-level `classes` object (the shape produced by the Python `SchemaView` export script in `omop-link`), it is passed through as-is without re-parsing.
+If the parsed object is already in the normalized `NormalizedSchema` shape (produced by the Python `SchemaView` export script in `omop-link`), it is passed through as-is without re-parsing.
+
+**Important**: raw LinkML YAML also has a top-level `classes` object, so a simple presence check is not sufficient to distinguish the two formats. `isNormalizedJson()` inspects the first class entry:
+
+- If the class has a `slot_usage` key → raw LinkML, route to `parseRawLinkML()`
+- If `slots` is a string array → raw LinkML (slot reference names), route to `parseRawLinkML()`
+- If `slots` is an object array with a `slot_name` field → normalized JSON, pass through
+
+This distinction is critical: passing raw YAML through as-is leaves `slots` as `string[]` instead of `ErdSlot[]`, causing `buildGraph` to produce zero nodes.
 
 ---
 
@@ -190,3 +198,126 @@ Uses Svelte 5 runes throughout:
 
 - `"handleConnectionChange" is imported … but never used` — originates inside `@xyflow/svelte`; not our code.
 - LSP may show stale type errors in `.svelte` files. **`npm run build` is the ground truth** — the build is clean.
+
+---
+
+## Svelte 5 + SvelteKit coding conventions
+
+> Source: https://cursor.directory/svelte5-sveltekit-development-guide
+
+### Key principles
+
+- Write concise, technical code with accurate Svelte 5 and SvelteKit examples.
+- Leverage SvelteKit's SSR and SSG capabilities (this project uses SSG/static).
+- Prioritize performance and minimal client-side JavaScript.
+- Use descriptive variable names and follow Svelte/SvelteKit conventions.
+- Organize files using SvelteKit's file-based routing system.
+
+### Code style
+
+- Use functional and declarative programming patterns; avoid unnecessary classes except for state machines.
+- Prefer iteration and modularization over code duplication.
+- Structure files: component logic, markup, styles, helpers, types.
+
+### Naming conventions
+
+- Lowercase with hyphens for component files (e.g. `auth-form.svelte`).
+- PascalCase for component names in imports and usage.
+- camelCase for variables, functions, and props.
+
+### TypeScript
+
+- Use TypeScript for all code; prefer `interface` over `type`.
+- Avoid enums; use `const` objects instead.
+- Enable strict mode (already configured in `tsconfig.json`).
+
+### Svelte 5 runes
+
+```typescript
+// Reactive state
+let count = $state(0);
+
+// Derived values
+let doubled = $derived(count * 2);
+
+// Side effects
+$effect(() => {
+  console.log(`Count is now ${count}`);
+});
+
+// Component props
+let { optionalProp = 42, requiredProp } = $props();
+
+// Two-way bindable props
+let { bindableProp = $bindable() } = $props();
+
+// Debug (development only)
+$inspect(count);
+```
+
+Use `$state.raw` for large arrays (e.g. `nodes`, `edges`) to avoid deep-reactivity overhead.
+
+### State machines (complex state)
+
+Use `.svelte.ts` files and classes for complex state:
+
+```typescript
+// counter.svelte.ts
+class Counter {
+  count = $state(0);
+  increment() { this.count += 1; }
+}
+export const counter = new Counter();
+```
+
+### Performance
+
+- Use `$state.raw` for large arrays where deep reactivity isn't needed.
+- Use `{#key}` blocks to force re-rendering when required.
+- Use dynamic imports for code splitting in large apps.
+- Use `$effect.tracking()` to optimise effect dependencies.
+- Minimise client-side JS; prefer SSR/SSG where possible.
+
+### Project structure
+
+```
+src/
+  lib/          # shared utilities, components, types
+  routes/       # file-based routing (+page.svelte, +layout.svelte, etc.)
+  app.html
+static/
+svelte.config.js
+vite.config.ts
+```
+
+### Component guidelines
+
+- Create `.svelte` files for components; `.svelte.ts` for logic/state machines.
+- Use Svelte's `$props` rune for data passing.
+- Use reactive declarations for local state management.
+
+### Routing and data loading
+
+- Use `[slug]` syntax for dynamic routes.
+- Use `load` functions for server-side or prerendered data fetching.
+- Handle errors with `+error.svelte` pages.
+
+### Accessibility
+
+- Use proper semantic HTML structure.
+- Add ARIA attributes where necessary.
+- Ensure keyboard navigation for all interactive elements.
+- Use `bind:this` to manage focus programmatically.
+
+### Key conventions
+
+1. Embrace Svelte's simplicity — avoid over-engineering.
+2. Prioritize Web Vitals (LCP, FID, CLS).
+3. Use environment variables for configuration.
+4. Keep Svelte and SvelteKit versions up to date.
+
+### Reference documentation
+
+- Svelte 5 runes: https://svelte.dev/docs/svelte/what-are-runes
+- Svelte docs: https://svelte.dev/docs
+- SvelteKit docs: https://svelte.dev/docs/kit

@@ -50,14 +50,35 @@ const PRIMITIVE_RANGES = new Set([
 // Parser: normalized JSON (legacy — pre-generated export format)
 // ---------------------------------------------------------------------------
 
-/** Check whether the input looks like our normalized JSON export */
+/**
+ * Check whether the input looks like our normalized JSON export.
+ *
+ * Raw LinkML YAML also has a top-level `classes` object, so we must be more
+ * specific: in the normalized format each class has a `slots` array of
+ * ErdSlot objects (with a `slot_name` string field), whereas raw LinkML has
+ * `slots` as an array of plain strings (slot reference names).
+ */
 function isNormalizedJson(raw: unknown): raw is NormalizedSchema {
-  return (
-    typeof raw === 'object' &&
-    raw !== null &&
-    'classes' in raw &&
-    typeof (raw as Record<string, unknown>).classes === 'object'
-  );
+  if (typeof raw !== 'object' || raw === null) return false;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.classes !== 'object' || r.classes === null) return false;
+
+  // Check the first class entry: if its slots array contains objects with a
+  // `slot_name` property it is our normalized format; if it contains strings
+  // (or the class has a raw `slot_usage` key) it is raw LinkML YAML.
+  const classes = r.classes as Record<string, unknown>;
+  const firstClass = Object.values(classes)[0];
+  if (typeof firstClass !== 'object' || firstClass === null) return false;
+  const fc = firstClass as Record<string, unknown>;
+
+  // Raw LinkML classes have slot_usage or slots as string[]
+  if ('slot_usage' in fc) return false;
+  const slots = fc.slots;
+  if (Array.isArray(slots) && slots.length > 0 && typeof slots[0] === 'string') return false;
+  // Normalized classes have slots as ErdSlot[] — objects with slot_name
+  if (Array.isArray(slots) && slots.length > 0 && typeof slots[0] === 'object') return true;
+  // Empty slots array or no slots — could be either; fall through to raw parser (safe)
+  return false;
 }
 
 function parseNormalizedJson(raw: NormalizedSchema): NormalizedSchema {
