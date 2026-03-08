@@ -18,6 +18,8 @@ import type {
   ErdSlot,
   RawLinkMLSchema,
   RawLinkMLSlot,
+  DomainConfig,
+  DomainInfo,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -132,6 +134,7 @@ function parseRawLinkML(raw: RawLinkMLSchema): NormalizedSchema {
           multivalued: Boolean(attrDef.multivalued),
           is_fk: isFk,
           description: String(attrDef.description ?? ''),
+          exact_mappings: Array.isArray(attrDef.exact_mappings) ? attrDef.exact_mappings.map(String) : [],
         });
       }
     }
@@ -169,6 +172,7 @@ function parseRawLinkML(raw: RawLinkMLSchema): NormalizedSchema {
           multivalued: Boolean(merged.multivalued),
           is_fk: isFk,
           description: String(merged.description ?? ''),
+          exact_mappings: Array.isArray(merged.exact_mappings) ? merged.exact_mappings.map(String) : [],
         });
       }
     }
@@ -177,6 +181,9 @@ function parseRawLinkML(raw: RawLinkMLSchema): NormalizedSchema {
       name: className,
       description: String(classDef.description ?? ''),
       slots,
+      domain: classDef.annotations?.domain?.value != null
+        ? String(classDef.annotations.domain.value)
+        : undefined,
     };
   }
 
@@ -226,4 +233,20 @@ export async function loadDefaultSchema(): Promise<NormalizedSchema> {
   if (!res.ok) throw new Error(`Failed to load default schema: ${res.statusText}`);
   const text = await res.text();
   return parseLinkMLSchema(text);
+}
+
+/**
+ * Load domain color/label configuration from the static YAML asset.
+ * Returns a Map keyed by domain name for O(1) lookup in TableNode.
+ */
+export async function loadDomainConfig(): Promise<Map<string, DomainInfo>> {
+  const res = await fetch(`${base}/domain-config.yaml`);
+  if (!res.ok) throw new Error(`Failed to load domain config: ${res.statusText}`);
+  const text = await res.text();
+  const raw = yaml.load(text) as DomainConfig;
+  const map = new Map<string, DomainInfo>();
+  for (const entry of raw.domains ?? []) {
+    map.set(entry.name, entry);
+  }
+  return map;
 }

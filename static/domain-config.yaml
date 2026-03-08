@@ -1,0 +1,34 @@
+# Domain configuration for the ERD viewer.
+# Each entry defines how a class domain is displayed (header color, label).
+# Colors match the omop-link DOMAIN_INFO palette exactly for OMOP domains.
+# Add new domains here — no code changes required.
+
+domains:
+  - name: clinical
+    label: Clinical
+    color: "#2563eb"
+    text_color: "#ffffff"
+  - name: vocabulary
+    label: Vocabulary
+    color: "#7c3aed"
+    text_color: "#ffffff"
+  - name: infrastructure
+    label: Infrastructure
+    color: "#059669"
+    text_color: "#ffffff"
+  - name: era
+    label: Era
+    color: "#d97706"
+    text_color: "#ffffff"
+  - name: episode
+    label: Episode
+    color: "#dc2626"
+    text_color: "#ffffff"
+  - name: hix
+    label: HiX Source
+    color: "#f59e0b"
+    text_color: "#ffffff"
+  - name: default
+    label: Other
+    color: "#475569"
+    text_color: "#ffffff"

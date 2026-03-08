@@ -1,6 +1,7 @@
 <script lang="ts">
+  import { getContext } from 'svelte';
   import { Handle, Position, type NodeProps, type Node } from '@xyflow/svelte';
-  import type { ErdNodeData, ErdSlot } from '$lib/types';
+  import type { ErdNodeData, ErdSlot, DomainInfo } from '$lib/types';
 
   // Accept the base unparameterised NodeProps — re-derive our data shape below.
   // (Svelte Flow v1 generics clash with TypeScript strict mode; see layout.ts.)
@@ -9,6 +10,29 @@
   // Re-derive data reactively so Svelte can track changes when the parent
   // rebuilds the node. The cast is intentional — see layout.ts for rationale.
   const rawData = $derived(data as unknown as ErdNodeData);
+
+  // Domain config injected by +page.svelte via setContext.
+  // The context holds a reactive $state wrapper { map } so that updates
+  // after the async fetch are visible here without re-running getContext.
+  const domainCtx = getContext<{ map: Map<string, DomainInfo> | null }>('domainConfig');
+
+  // Default fallback when no domain config or unknown domain
+  const DEFAULT_COLOR = '#475569';
+  const DEFAULT_TEXT = '#ffffff';
+
+  const headerColor = $derived((() => {
+    const domain = rawData.domain;
+    const map = domainCtx?.map;
+    if (!domain || !map) return DEFAULT_COLOR;
+    return map.get(domain)?.color ?? map.get('default')?.color ?? DEFAULT_COLOR;
+  })());
+
+  const headerText = $derived((() => {
+    const domain = rawData.domain;
+    const map = domainCtx?.map;
+    if (!domain || !map) return DEFAULT_TEXT;
+    return map.get(domain)?.text_color ?? map.get('default')?.text_color ?? DEFAULT_TEXT;
+  })());
 
   // ---------------------------------------------------------------------------
   // State
@@ -42,9 +66,16 @@
     return slot.range;
   }
 
-  // Single neutral header color — no domain coloring
-  const HEADER_COLOR = '#475569'; // slate-600
-  const HEADER_TEXT = '#ffffff';
+  /** Return the first exact_mapping value, shortened for display.
+   *  e.g. "omop_cdm54:Person.person_source_value" → "Person.person_source_value"
+   */
+  function primaryMapping(slot: ErdSlot): string {
+    const m = slot.exact_mappings?.[0];
+    if (!m) return '';
+    // Strip the prefix (everything up to and including the last colon)
+    const colon = m.lastIndexOf(':');
+    return colon >= 0 ? m.slice(colon + 1) : m;
+  }
 </script>
 
 <!-- Handles on left (target) and right (source) -->
@@ -55,8 +86,8 @@
   <!-- Header -->
   <button
     class="header"
-    style:background={HEADER_COLOR}
-    style:color={HEADER_TEXT}
+    style:background={headerColor}
+    style:color={headerText}
     onclick={() => (collapsed = !collapsed)}
     title={rawData.description || rawData.label}
     aria-expanded={!collapsed}
@@ -81,6 +112,9 @@
           </span>
           <span class="slot-name">{slot.name}</span>
           <span class="slot-type">{slotTypeLabel(slot)}</span>
+          {#if primaryMapping(slot)}
+            <span class="slot-mapping" title={slot.exact_mappings.join('\n')}>{primaryMapping(slot)}</span>
+          {/if}
         </div>
       {/each}
       {#if hiddenCount > 0}
@@ -201,5 +235,17 @@
     font-size: 10px;
     color: #94a3b8;
     font-style: italic;
+  }
+
+  .slot-mapping {
+    font-size: 9px;
+    color: #6366f1; /* indigo-500 */
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-style: italic;
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: default;
   }
 </style>

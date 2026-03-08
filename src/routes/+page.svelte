@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, setContext } from 'svelte';
   import {
     SvelteFlow,
     Background,
@@ -15,9 +15,17 @@
   import SearchBar from '$lib/components/SearchBar.svelte';
   import FlowController from '$lib/components/FlowController.svelte';
 
-  import { loadDefaultSchema } from '$lib/linkml';
+  import { loadDefaultSchema, loadDomainConfig } from '$lib/linkml';
   import { buildGraph } from '$lib/layout';
-  import type { NormalizedSchema, LayoutOptions } from '$lib/types';
+  import type { NormalizedSchema, LayoutOptions, DomainInfo } from '$lib/types';
+
+  // ---------------------------------------------------------------------------
+  // Domain config — set context synchronously with a reactive holder so
+  // TableNode can read it reactively once the fetch resolves.
+  // setContext must be called at init time (not inside onMount/async).
+  // ---------------------------------------------------------------------------
+  const domainCtx = $state<{ map: Map<string, DomainInfo> | null }>({ map: null });
+  setContext('domainConfig', domainCtx);
 
   // ---------------------------------------------------------------------------
   // Node types registration
@@ -97,7 +105,12 @@
     collapsed = new Set();
   }
 
-  onMount(loadDefault);
+  onMount(() => {
+    loadDefault();
+    loadDomainConfig()
+      .then((map: Map<string, DomainInfo>) => { domainCtx.map = map; })
+      .catch((e: unknown) => console.warn('domain-config load failed:', e));
+  });
 
   // ---------------------------------------------------------------------------
   // Search: set pan target — FlowController handles the pan

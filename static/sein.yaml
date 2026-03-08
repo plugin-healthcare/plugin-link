@@ -1,0 +1,1867 @@
+name: sein
+id: https://timformatie.github.io/SEIN-OMOP/sein
+description: >-
+  Combined schema for the SEIN-OMOP project. Merges HiX staging classes
+  (source system) with the OMOP CDM v5.4 target classes. Slot-level ETL
+  mappings from HiX to OMOP are expressed as exact_mappings using the
+  omop_cdm54 prefix.
+imports:
+- linkml:types
+prefixes:
+  linkml:
+    prefix_prefix: linkml
+    prefix_reference: https://w3id.org/linkml/
+  sein:
+    prefix_prefix: sein
+    prefix_reference: https://timformatie.github.io/SEIN-OMOP/sein/
+  omop_cdm54:
+    prefix_prefix: omop_cdm54
+    prefix_reference: https://timformatie.github.io/SEIN-OMOP/omop-cdm54/
+default_prefix: sein
+default_range: string
+
+# ---------------------------------------------------------------------------
+# HiX staging classes (domain: hix)
+# ---------------------------------------------------------------------------
+classes:
+  AdmissionOrigins:
+    name: AdmissionOrigins
+    annotations:
+      source_table:
+        tag: source_table
+        value: opname_herkomst
+      domain:
+        tag: domain
+        value: hix
+    description: 'Staging model for HiX source table: opname_herkomst'
+    attributes:
+      admission_origin_id:
+        name: admission_origin_id
+        annotations:
+          source_column:
+            tag: source_column
+            value: CODE
+        identifier: true
+        range: integer
+      admission_origin_description:
+        name: admission_origin_description
+        annotations:
+          source_column:
+            tag: source_column
+            value: OMSCHR
+        range: string
+
+  AdmissionTypes:
+    name: AdmissionTypes
+    annotations:
+      source_table:
+        tag: source_table
+        value: opname_opntype1
+      domain:
+        tag: domain
+        value: hix
+    description: 'Staging model for HiX source table: opname_opntype1'
+    attributes:
+      admission_type_id:
+        name: admission_type_id
+        annotations:
+          source_column:
+            tag: source_column
+            value: CODE
+        identifier: true
+        range: integer
+      admission_type_description:
+        name: admission_type_description
+        annotations:
+          source_column:
+            tag: source_column
+            value: OMSCHR
+        range: string
+
+  Admissions:
+    name: Admissions
+    annotations:
+      source_table:
+        tag: source_table
+        value: opname_opname
+      domain:
+        tag: domain
+        value: hix
+    description: 'Staging model for HiX source table: opname_opname'
+    attributes:
+      admission_id:
+        name: admission_id
+        annotations:
+          source_column:
+            tag: source_column
+            value: PLANNR
+        identifier: true
+        range: integer
+        exact_mappings:
+        - omop_cdm54:VisitOccurrence.visit_occurrence_id
+      referrer_id:
+        name: referrer_id
+        annotations:
+          source_column:
+            tag: source_column
+            value: VERWIJZER
+        range: integer
+      physician_id:
+        name: physician_id
+        annotations:
+          source_column:
+            tag: source_column
+            value: BEHANDELAA
+        range: integer
+      patient_number:
+        name: patient_number
+        annotations:
+          source_column:
+            tag: source_column
+            value: PATIENTNR
+        range: integer
+        exact_mappings:
+        - omop_cdm54:VisitOccurrence.person_id
+      admission_type:
+        name: admission_type
+        annotations:
+          source_column:
+            tag: source_column
+            value: OPNTYPE
+        range: string
+        exact_mappings:
+        - omop_cdm54:VisitOccurrence.visit_source_value
+      specialism:
+        name: specialism
+        annotations:
+          source_column:
+            tag: source_column
+            value: SPECIALISM
+        range: string
+      location_type:
+        name: location_type
+        annotations:
+          source_column:
+            tag: source_column
+            value: LOCATIE
+        range: string
+      admission_origin:
+        name: admission_origin
+        annotations:
+          source_column:
+            tag: source_column
+            value: HERKOMST
+        range: string
+        exact_mappings:
+        - omop_cdm54:VisitOccurrence.admitted_from_source_value
+      admission_duration:
+        name: admission_duration
+        annotations:
+          source_column:
+            tag: source_column
+            value: OPNDUUR
+        range: string
+      admission_start_date:
+        name: admission_start_date
+        annotations:
+          source_column:
+            tag: source_column
+            value: OPNDAT
+        range: date
+        exact_mappings:
+        - omop_cdm54:VisitOccurrence.visit_start_date
+      admission_end_date:
+        name: admission_end_date
+        annotations:
+          source_column:
+            tag: source_column
+            value: ONTSLDAT
+        range: date
+        exact_mappings:
+        - omop_cdm54:VisitOccurrence.visit_end_date
+      admission_start_time:
+        name: admission_start_time
+        annotations:
+          source_column:
+            tag: source_column
+            value: OPNTIJD
+        range: string
+        exact_mappings:
+        - omop_cdm54:VisitOccurrence.visit_start_datetime
+      admission_end_time:
+        name: admission_end_time
+        annotations:
+          source_column:
+            tag: source_column
+            value: ONTSLTIJD
+        range: string
+        exact_mappings:
+        - omop_cdm54:VisitOccurrence.visit_end_datetime
+
+  ConsultCategories:
+    name: ConsultCategories
+    annotations:
+      source_table:
+        tag: source_table
+        value: consult_category
+      domain:
+        tag: domain
+        value: hix
+    description: 'Staging model for HiX source table: consult_category'
+    attributes:
+      consult_category_id:
+        name: consult_category_id
+        annotations:
+          source_column:
+            tag: source_column
+            value: CATID
+        identifier: true
+        range: integer
+      consult_category_description:
+        name: consult_category_description
+        annotations:
+          source_column:
+            tag: source_column
+            value: NAAM
+        range: string
+        exact_mappings:
+        - omop_cdm54:Note.note_title
+
+  Consults:
+    name: Consults
+    annotations:
+      source_table:
+        tag: source_table
+        value: consult_regpart
+      domain:
+        tag: domain
+        value: hix
+    description: 'Staging model for HiX source table: consult_regpart'
+    attributes:
+      consult_id:
+        name: consult_id
+        annotations:
+          source_column:
+            tag: source_column
+            value: PARTID
+        identifier: true
+        range: integer
+        exact_mappings:
+        - omop_cdm54:VisitOccurrence.visit_occurrence_id
+        - omop_cdm54:Note.note_id
+        - omop_cdm54:Note.note_event_id
+      patient_number:
+        name: patient_number
+        annotations:
+          source_column:
+            tag: source_column
+            value: PATIENTNR
+        range: integer
+        exact_mappings:
+        - omop_cdm54:VisitOccurrence.person_id
+        - omop_cdm54:Note.person_id
+      physician_id:
+        name: physician_id
+        annotations:
+          source_column:
+            tag: source_column
+            value: ARTS
+        range: integer
+      consult_category_id:
+        name: consult_category_id
+        annotations:
+          source_column:
+            tag: source_column
+            value: CATEGORYID
+        range: integer
+        exact_mappings:
+        - omop_cdm54:VisitOccurrence.visit_source_value
+      specialism:
+        name: specialism
+        annotations:
+          source_column:
+            tag: source_column
+            value: SPECIALISM
+        range: string
+      care_instance:
+        name: care_instance
+        annotations:
+          source_column:
+            tag: source_column
+            value: CareInstance
+        range: string
+      consult_text:
+        name: consult_text
+        annotations:
+          source_column:
+            tag: source_column
+            value: TEXT
+        range: string
+        exact_mappings:
+        - omop_cdm54:Note.note_text
+      consult_date:
+        name: consult_date
+        annotations:
+          source_column:
+            tag: source_column
+            value: DATE
+        range: date
+        exact_mappings:
+        - omop_cdm54:VisitOccurrence.visit_start_date
+        - omop_cdm54:VisitOccurrence.visit_end_date
+        - omop_cdm54:Note.note_date
+      consult_time:
+        name: consult_time
+        annotations:
+          source_column:
+            tag: source_column
+            value: TIME
+        range: string
+        exact_mappings:
+        - omop_cdm54:VisitOccurrence.visit_start_datetime
+        - omop_cdm54:Note.note_datetime
+
+  DiagnoseCode:
+    name: DiagnoseCode
+    annotations:
+      source_table:
+        tag: source_table
+        value: episode_diag
+      domain:
+        tag: domain
+        value: hix
+    description: 'Staging model for HiX source table: episode_diag'
+    attributes:
+      diagnosis_code:
+        name: diagnosis_code
+        annotations:
+          source_column:
+            tag: source_column
+            value: code
+        identifier: true
+        range: integer
+      diagnosis_description:
+        name: diagnosis_description
+        annotations:
+          source_column:
+            tag: source_column
+            value: omschrijv
+        range: string
+      diagnosis_description_extended:
+        name: diagnosis_description_extended
+        annotations:
+          source_column:
+            tag: source_column
+            value: langeomsch
+        range: string
+        exact_mappings:
+        - omop_cdm54:ConditionOccurrence.condition_source_value
+      specialism:
+        name: specialism
+        annotations:
+          source_column:
+            tag: source_column
+            value: specialism
+        range: string
+      diagnosis_code_start_date:
+        name: diagnosis_code_start_date
+        annotations:
+          source_column:
+            tag: source_column
+            value: datum
+        range: date
+      diagnosis_code_end_date:
+        name: diagnosis_code_end_date
+        annotations:
+          source_column:
+            tag: source_column
+            value: einddatum
+        range: date
+
+  DiagnosesAndTreatments:
+    name: DiagnosesAndTreatments
+    annotations:
+      source_table:
+        tag: source_table
+        value: episode_dbcper
+      domain:
+        tag: domain
+        value: hix
+    description: 'Staging model for HiX source table: episode_dbcper'
+    attributes:
+      diagnosis_treatment_id:
+        name: diagnosis_treatment_id
+        annotations:
+          source_column:
+            tag: source_column
+            value: dbcnummer
+        identifier: true
+        range: integer
+        exact_mappings:
+        - omop_cdm54:ConditionOccurrence.condition_occurrence_id
+      episode_id:
+        name: episode_id
+        annotations:
+          source_column:
+            tag: source_column
+            value: episode
+        range: integer
+      executor:
+        name: executor
+        annotations:
+          source_column:
+            tag: source_column
+            value: uitvoerder
+        range: integer
+      treatment_id:
+        name: treatment_id
+        annotations:
+          source_column:
+            tag: source_column
+            value: verrichtingid
+        range: integer
+      specialism:
+        name: specialism
+        annotations:
+          source_column:
+            tag: source_column
+            value: specialism
+        range: string
+      sub_specialism:
+        name: sub_specialism
+        annotations:
+          source_column:
+            tag: source_column
+            value: subspec
+        range: string
+      exit_code:
+        name: exit_code
+        annotations:
+          source_column:
+            tag: source_column
+            value: afsluit
+        range: string
+      care_type:
+        name: care_type
+        annotations:
+          source_column:
+            tag: source_column
+            value: zorgtype
+        range: string
+      care_demand_code:
+        name: care_demand_code
+        annotations:
+          source_column:
+            tag: source_column
+            value: zorgvraag
+        range: string
+      main_diagnosis:
+        name: main_diagnosis
+        annotations:
+          source_column:
+            tag: source_column
+            value: hoofddiag
+        range: string
+      location:
+        name: location
+        annotations:
+          source_column:
+            tag: source_column
+            value: locatie
+        range: string
+      status_code:
+        name: status_code
+        annotations:
+          source_column:
+            tag: source_column
+            value: status
+        range: string
+      care_product:
+        name: care_product
+        annotations:
+          source_column:
+            tag: source_column
+            value: zorgprod
+        range: string
+      icd10_code:
+        name: icd10_code
+        annotations:
+          source_column:
+            tag: source_column
+            value: icd10
+        range: string
+        exact_mappings:
+        - omop_cdm54:ConditionOccurrence.condition_concept_id
+      diagnose_code:
+        name: diagnose_code
+        annotations:
+          source_column:
+            tag: source_column
+            value: hoofddiag
+        range: integer
+      episode_start_date:
+        name: episode_start_date
+        annotations:
+          source_column:
+            tag: source_column
+            value: begindat
+        range: date
+        exact_mappings:
+        - omop_cdm54:ConditionOccurrence.condition_start_date
+      episode_end_date:
+        name: episode_end_date
+        annotations:
+          source_column:
+            tag: source_column
+            value: einddat
+        range: date
+        exact_mappings:
+        - omop_cdm54:ConditionOccurrence.condition_end_date
+
+  Episodes:
+    name: Episodes
+    annotations:
+      source_table:
+        tag: source_table
+        value: episode_episode
+      domain:
+        tag: domain
+        value: hix
+    description: 'Staging model for HiX source table: episode_episode'
+    attributes:
+      episode_id:
+        name: episode_id
+        annotations:
+          source_column:
+            tag: source_column
+            value: episode
+        identifier: true
+        range: integer
+        exact_mappings:
+        - omop_cdm54:ObservationPeriod.observation_period_id
+      patient_number:
+        name: patient_number
+        annotations:
+          source_column:
+            tag: source_column
+            value: patientnr
+        range: integer
+        exact_mappings:
+        - omop_cdm54:ObservationPeriod.person_id
+        - omop_cdm54:ConditionOccurrence.person_id
+      referral_number:
+        name: referral_number
+        annotations:
+          source_column:
+            tag: source_column
+            value: verwijsnr
+        range: integer
+      episode_description:
+        name: episode_description
+        annotations:
+          source_column:
+            tag: source_column
+            value: omschr
+        range: string
+      specialism:
+        name: specialism
+        annotations:
+          source_column:
+            tag: source_column
+            value: specialism
+        range: string
+      episode_location:
+        name: episode_location
+        annotations:
+          source_column:
+            tag: source_column
+            value: locatie
+        range: string
+      care_type:
+        name: care_type
+        annotations:
+          source_column:
+            tag: source_column
+            value: zorgtype
+        range: string
+      diagnose_code:
+        name: diagnose_code
+        annotations:
+          source_column:
+            tag: source_column
+            value: hoofddiag
+        range: integer
+      episode_start_date:
+        name: episode_start_date
+        annotations:
+          source_column:
+            tag: source_column
+            value: begindat
+        range: date
+        exact_mappings:
+        - omop_cdm54:ObservationPeriod.observation_period_start_date
+      episode_end_date:
+        name: episode_end_date
+        annotations:
+          source_column:
+            tag: source_column
+            value: einddat
+        range: date
+        exact_mappings:
+        - omop_cdm54:ObservationPeriod.observation_period_end_date
+      episode_dbc_end_date:
+        name: episode_dbc_end_date
+        annotations:
+          source_column:
+            tag: source_column
+            value: einddatdbc
+        range: date
+        exact_mappings:
+        - omop_cdm54:ObservationPeriod.observation_period_end_date
+
+  LabRequests:
+    name: LabRequests
+    annotations:
+      source_table:
+        tag: source_table
+        value: lab_l_aanvrg
+      domain:
+        tag: domain
+        value: hix
+    description: 'Staging model for HiX source table: lab_l_aanvrg'
+    attributes:
+      lab_request_id:
+        name: lab_request_id
+        annotations:
+          source_column:
+            tag: source_column
+            value: AANVRAAGNR
+        identifier: true
+        range: integer
+        exact_mappings:
+        - omop_cdm54:VisitOccurrence.visit_occurrence_id
+      referrer_id:
+        name: referrer_id
+        annotations:
+          source_column:
+            tag: source_column
+            value: AANVRAGER
+        range: integer
+      physician_id:
+        name: physician_id
+        annotations:
+          source_column:
+            tag: source_column
+            value: __null__
+        range: integer
+      patient_number:
+        name: patient_number
+        annotations:
+          source_column:
+            tag: source_column
+            value: PATIENTNR
+        range: integer
+        exact_mappings:
+        - omop_cdm54:VisitOccurrence.person_id
+      lab_request_start_date:
+        name: lab_request_start_date
+        annotations:
+          source_column:
+            tag: source_column
+            value: AFDATUM
+        range: date
+        exact_mappings:
+        - omop_cdm54:VisitOccurrence.visit_start_date
+      lab_request_end_date:
+        name: lab_request_end_date
+        annotations:
+          source_column:
+            tag: source_column
+            value: ZENDDATUM
+        range: date
+        exact_mappings:
+        - omop_cdm54:VisitOccurrence.visit_end_date
+      lab_request_start_time:
+        name: lab_request_start_time
+        annotations:
+          source_column:
+            tag: source_column
+            value: AFTIJD
+        range: string
+        exact_mappings:
+        - omop_cdm54:VisitOccurrence.visit_start_datetime
+      lab_request_end_time:
+        name: lab_request_end_time
+        annotations:
+          source_column:
+            tag: source_column
+            value: SENDTIME
+        range: string
+        exact_mappings:
+        - omop_cdm54:VisitOccurrence.visit_end_datetime
+
+  Medication:
+    name: Medication
+    annotations:
+      source_table:
+        tag: source_table
+        value: medicat_recdeel
+      domain:
+        tag: domain
+        value: hix
+    description: 'Staging model for HiX source table: medicat_recdeel'
+    attributes:
+      prescription_id:
+        name: prescription_id
+        annotations:
+          source_column:
+            tag: source_column
+            value: IDENTIF
+        identifier: true
+        range: integer
+        exact_mappings:
+        - omop_cdm54:DrugExposure.drug_exposure_id
+      patient_number:
+        name: patient_number
+        annotations:
+          source_column:
+            tag: source_column
+            value: PATIENTNR
+        range: integer
+        exact_mappings:
+        - omop_cdm54:DrugExposure.person_id
+      medicine_id:
+        name: medicine_id
+        annotations:
+          source_column:
+            tag: source_column
+            value: MEDCD
+        range: integer
+      duration_code:
+        name: duration_code
+        annotations:
+          source_column:
+            tag: source_column
+            value: IssueRequestDurationUnit
+        range: string
+      explanation:
+        name: explanation
+        annotations:
+          source_column:
+            tag: source_column
+            value: EXDISPL
+        range: string
+        exact_mappings:
+        - omop_cdm54:DrugExposure.sig
+      delivery_unit_code:
+        name: delivery_unit_code
+        annotations:
+          source_column:
+            tag: source_column
+            value: DeliveryUnitCode
+        range: string
+        exact_mappings:
+        - omop_cdm54:DrugExposure.dose_unit_source_value
+      administration_code:
+        name: administration_code
+        annotations:
+          source_column:
+            tag: source_column
+            value: TOEDCD
+        range: string
+      prescription_type:
+        name: prescription_type
+        annotations:
+          source_column:
+            tag: source_column
+            value: VRSCHRTYP
+        range: string
+      stop_reason:
+        name: stop_reason
+        annotations:
+          source_column:
+            tag: source_column
+            value: STPREDEN
+        range: string
+        exact_mappings:
+        - omop_cdm54:DrugExposure.stop_reason
+      registration_type:
+        name: registration_type
+        annotations:
+          source_column:
+            tag: source_column
+            value: REGTYPE
+        range: string
+      pharmacy_code:
+        name: pharmacy_code
+        annotations:
+          source_column:
+            tag: source_column
+            value: APOTHCODE
+        range: string
+      administration_method:
+        name: administration_method
+        annotations:
+          source_column:
+            tag: source_column
+            value: TOEDOMS
+        range: string
+      medication_group:
+        name: medication_group
+        annotations:
+          source_column:
+            tag: source_column
+            value: GROEPOMS
+        range: string
+      schema_code:
+        name: schema_code
+        annotations:
+          source_column:
+            tag: source_column
+            value: SCHEMCD
+        range: string
+      duration:
+        name: duration
+        annotations:
+          source_column:
+            tag: source_column
+            value: IssueRequestDurationAmount
+        range: integer
+      repetitions:
+        name: repetitions
+        annotations:
+          source_column:
+            tag: source_column
+            value: Repetitions
+        range: integer
+        exact_mappings:
+        - omop_cdm54:DrugExposure.refills
+      delivery_amount:
+        name: delivery_amount
+        annotations:
+          source_column:
+            tag: source_column
+            value: DeliveryAmount
+        range: integer
+        exact_mappings:
+        - omop_cdm54:DrugExposure.quantity
+      prescription_start_date:
+        name: prescription_start_date
+        annotations:
+          source_column:
+            tag: source_column
+            value: VRSCHRDAT
+        range: date
+        exact_mappings:
+        - omop_cdm54:DrugExposure.drug_exposure_start_date
+      prescription_end_date:
+        name: prescription_end_date
+        annotations:
+          source_column:
+            tag: source_column
+            value: InitialStopDate
+        range: date
+        exact_mappings:
+        - omop_cdm54:DrugExposure.verbatim_end_date
+      prescription_start_time:
+        name: prescription_start_time
+        annotations:
+          source_column:
+            tag: source_column
+            value: ACCTD
+        range: string
+
+  Medicines:
+    name: Medicines
+    annotations:
+      source_table:
+        tag: source_table
+        value: medicat_medicijn
+      domain:
+        tag: domain
+        value: hix
+    description: 'Staging model for HiX source table: medicat_medicijn'
+    attributes:
+      medicine_id:
+        name: medicine_id
+        annotations:
+          source_column:
+            tag: source_column
+            value: CODE
+        identifier: true
+        range: integer
+      medicine_description:
+        name: medicine_description
+        annotations:
+          source_column:
+            tag: source_column
+            value: OMSCHR
+        range: string
+      atc_code:
+        name: atc_code
+        annotations:
+          source_column:
+            tag: source_column
+            value: ATCCODE
+        range: string
+        exact_mappings:
+        - omop_cdm54:DrugExposure.drug_concept_id
+        - omop_cdm54:DrugExposure.drug_source_value
+      z_index:
+        name: z_index
+        annotations:
+          source_column:
+            tag: source_column
+            value: ZNDXART
+        range: string
+      z_index_hpk:
+        name: z_index_hpk
+        annotations:
+          source_column:
+            tag: source_column
+            value: ZNDXHPK
+        range: string
+      z_index_prk:
+        name: z_index_prk
+        annotations:
+          source_column:
+            tag: source_column
+            value: ZNDXPRK
+        range: string
+      z_index_gpk:
+        name: z_index_gpk
+        annotations:
+          source_column:
+            tag: source_column
+            value: ZNDXGPK
+        range: string
+
+  Patients:
+    name: Patients
+    annotations:
+      source_table:
+        tag: source_table
+        value: patient_patient
+      domain:
+        tag: domain
+        value: hix
+    description: 'Staging model for HiX source table: patient_patient'
+    attributes:
+      patient_number:
+        name: patient_number
+        annotations:
+          source_column:
+            tag: source_column
+            value: PATIENTNR
+        identifier: true
+        range: integer
+        exact_mappings:
+        - omop_cdm54:Person.person_source_value
+      gender:
+        name: gender
+        annotations:
+          source_column:
+            tag: source_column
+            value: GESLACHT
+        range: string
+        exact_mappings:
+        - omop_cdm54:Person.gender_source_value
+      street:
+        name: street
+        annotations:
+          source_column:
+            tag: source_column
+            value: ADRES
+        range: string
+        exact_mappings:
+        - omop_cdm54:Location.address_1
+      house_number:
+        name: house_number
+        annotations:
+          source_column:
+            tag: source_column
+            value: HUISNR
+        range: string
+        exact_mappings:
+        - omop_cdm54:Location.address_2
+      zip_code:
+        name: zip_code
+        annotations:
+          source_column:
+            tag: source_column
+            value: POSTCODE
+        range: string
+        exact_mappings:
+        - omop_cdm54:Location.zip
+      city:
+        name: city
+        annotations:
+          source_column:
+            tag: source_column
+            value: WOONPLAATS
+        range: string
+        exact_mappings:
+        - omop_cdm54:Location.city
+      country:
+        name: country
+        annotations:
+          source_column:
+            tag: source_column
+            value: LAND
+        range: string
+        exact_mappings:
+        - omop_cdm54:Location.country_source_value
+      general_practitioner:
+        name: general_practitioner
+        annotations:
+          source_column:
+            tag: source_column
+            value: HUISARTS
+        range: string
+      birth_date:
+        name: birth_date
+        annotations:
+          source_column:
+            tag: source_column
+            value: GEBDAT
+        range: date
+        exact_mappings:
+        - omop_cdm54:Person.year_of_birth
+        - omop_cdm54:Person.month_of_birth
+        - omop_cdm54:Person.day_of_birth
+      birth_time:
+        name: birth_time
+        annotations:
+          source_column:
+            tag: source_column
+            value: GEBOORTETIJD
+        range: string
+
+  Units:
+    name: Units
+    annotations:
+      source_table:
+        tag: source_table
+        value: medicat_eenheid
+      domain:
+        tag: domain
+        value: hix
+    description: 'Staging model for HiX source table: medicat_eenheid'
+    attributes:
+      unit_id:
+        name: unit_id
+        annotations:
+          source_column:
+            tag: source_column
+            value: CODE
+        identifier: true
+        range: integer
+      unit_description:
+        name: unit_description
+        annotations:
+          source_column:
+            tag: source_column
+            value: OMSCHR
+        range: string
+        exact_mappings:
+        - omop_cdm54:DrugExposure.dose_unit_source_value
+
+# ---------------------------------------------------------------------------
+# OMOP CDM v5.4 classes (domains: clinical / vocabulary / infrastructure)
+# ---------------------------------------------------------------------------
+
+  CdmSource:
+    name: CdmSource
+    annotations:
+      domain:
+        tag: domain
+        value: infrastructure
+    description: The CDM_SOURCE table contains detail about the source database and
+      the process used to transform the data into the OMOP Common Data Model.
+    attributes:
+      cdm_source_name:
+        name: cdm_source_name
+        description: The name of the CDM instance.
+        required: true
+      cdm_source_abbreviation:
+        name: cdm_source_abbreviation
+        description: The abbreviation of the CDM instance.
+        required: true
+      cdm_holder:
+        name: cdm_holder
+        description: The holder of the CDM instance.
+        required: true
+      source_description:
+        name: source_description
+        description: The description of the CDM instance.
+      source_documentation_reference:
+        name: source_documentation_reference
+        description: Refers to a publication or web resource describing the source data
+      cdm_etl_reference:
+        name: cdm_etl_reference
+      source_release_date:
+        name: source_release_date
+        description: The date the data was extracted from the source system.
+        required: true
+      cdm_release_date:
+        name: cdm_release_date
+        description: The date the ETL script was completed.
+        required: true
+      cdm_version:
+        name: cdm_version
+        description: Version of the OMOP CDM used as string. e.g. v5.4
+      cdm_version_concept_id:
+        name: cdm_version_concept_id
+        description: The Concept Id representing the version of the CDM.
+        range: Concept
+        required: true
+      vocabulary_version:
+        name: vocabulary_version
+        description: Version of the OMOP standardised vocabularies loaded
+        required: true
+
+  ConceptAncestor:
+    name: ConceptAncestor
+    annotations:
+      domain:
+        tag: domain
+        value: vocabulary
+    description: The CONCEPT_ANCESTOR table is designed to simplify observational
+      analysis by providing the complete hierarchical relationships between Concepts.
+    attributes:
+      ancestor_concept_id:
+        name: ancestor_concept_id
+        description: The Concept Id for the higher-level concept that forms the ancestor
+          in the relationship.
+        range: Concept
+        required: true
+      descendant_concept_id:
+        name: descendant_concept_id
+        description: The Concept Id for the lower-level concept that forms the descendant
+          in the relationship.
+        range: Concept
+        required: true
+      min_levels_of_separation:
+        name: min_levels_of_separation
+        description: The minimum separation in number of levels of hierarchy between
+          ancestor and descendant concepts.
+        required: true
+      max_levels_of_separation:
+        name: max_levels_of_separation
+        description: The maximum separation in number of levels of hierarchy between
+          ancestor and descendant concepts.
+        required: true
+
+  ConceptClass:
+    name: ConceptClass
+    annotations:
+      domain:
+        tag: domain
+        value: vocabulary
+    description: The CONCEPT_CLASS table includes semantic categories that reference
+      the source structure of each Vocabulary.
+    attributes:
+      concept_class_id:
+        name: concept_class_id
+        description: A unique key for each class.
+        identifier: true
+        required: true
+      concept_class_name:
+        name: concept_class_name
+        description: The name describing the Concept Class.
+        required: true
+      concept_class_concept_id:
+        name: concept_class_concept_id
+        description: A Concept that represents the Concept Class.
+        range: Concept
+        required: true
+
+  ConceptRelation:
+    name: ConceptRelation
+    annotations:
+      domain:
+        tag: domain
+        value: vocabulary
+    description: The CONCEPT_RELATIONSHIP table contains records that define relationships
+      between any two Concepts and the nature or type of the relationship.
+    attributes:
+      concept_id_1:
+        name: concept_id_1
+        range: Concept
+        required: true
+      concept_id_2:
+        name: concept_id_2
+        range: Concept
+        required: true
+      relationship_id:
+        name: relationship_id
+        description: The relationship between CONCEPT_ID_1 and CONCEPT_ID_2.
+        range: Relationship
+        required: true
+      valid_start_date:
+        name: valid_start_date
+        description: The date when the relationship is first recorded.
+        required: true
+      valid_end_date:
+        name: valid_end_date
+        description: The date when the relationship is invalidated.
+        required: true
+      invalid_reason:
+        name: invalid_reason
+        description: Reason the relationship was invalidated.
+
+  ConceptSynonym:
+    name: ConceptSynonym
+    annotations:
+      domain:
+        tag: domain
+        value: vocabulary
+    description: The CONCEPT_SYNONYM table captures alternative terms, synonyms, and
+      translations of Concept Name into various languages.
+    attributes:
+      concept_id:
+        name: concept_id
+        range: Concept
+        required: true
+      concept_synonym_name:
+        name: concept_synonym_name
+        required: true
+      language_concept_id:
+        name: language_concept_id
+        range: Concept
+        required: true
+
+  Concept:
+    name: Concept
+    annotations:
+      domain:
+        tag: domain
+        value: vocabulary
+    description: The Standardized Vocabularies contains records, or Concepts, that
+      uniquely identify each fundamental unit of meaning used to express clinical
+      information in all domain tables of the CDM.
+    attributes:
+      concept_id:
+        name: concept_id
+        description: A unique identifier for each Concept across all domains.
+        identifier: true
+        required: true
+      concept_name:
+        name: concept_name
+        description: An unambiguous, meaningful and descriptive name for the Concept.
+        required: true
+      domain_id:
+        name: domain_id
+        description: A foreign key to the DOMAIN table the Concept belongs to.
+        range: Domain
+        required: true
+      vocabulary_id:
+        name: vocabulary_id
+        description: A foreign key to the VOCABULARY table indicating from which source
+          the Concept has been adapted.
+        range: Vocabulary
+        required: true
+      concept_class_id:
+        name: concept_class_id
+        description: The attribute or concept class of the Concept.
+        range: ConceptClass
+        required: true
+      standard_concept:
+        name: standard_concept
+        description: Flag determining whether a Concept is Standard, Classification,
+          or non-standard.
+      concept_code:
+        name: concept_code
+        description: The concept code represents the identifier of the Concept in the
+          source vocabulary.
+        required: true
+      valid_start_date:
+        name: valid_start_date
+        description: The date when the Concept was first recorded.
+        required: true
+      valid_end_date:
+        name: valid_end_date
+        description: The date when the Concept became invalid.
+        required: true
+      invalid_reason:
+        name: invalid_reason
+        description: Reason the Concept was invalidated.
+
+  ConditionOccurrence:
+    name: ConditionOccurrence
+    annotations:
+      domain:
+        tag: domain
+        value: clinical
+    description: This table captures records of conditions observed for a Person.
+    attributes:
+      condition_occurrence_id:
+        name: condition_occurrence_id
+        description: The unique key given to a condition record for a person.
+        identifier: true
+        required: true
+      person_id:
+        name: person_id
+        description: The PERSON_ID of the PERSON for whom the condition is recorded.
+        range: Person
+        required: true
+      condition_concept_id:
+        name: condition_concept_id
+        description: The standard concept mapped from the source value which represents
+          a condition.
+        range: Concept
+        required: true
+      condition_start_date:
+        name: condition_start_date
+        description: Use this date to determine the start date of the condition.
+        required: true
+      condition_start_datetime:
+        name: condition_start_datetime
+      condition_end_date:
+        name: condition_end_date
+        description: Use this date to determine the end date of the condition.
+      condition_end_datetime:
+        name: condition_end_datetime
+      condition_type_concept_id:
+        name: condition_type_concept_id
+        description: This field can be used to determine the provenance of the Condition
+          record.
+        range: Concept
+        required: true
+      condition_status_concept_id:
+        name: condition_status_concept_id
+        description: This concept represents the point during the visit the diagnosis
+          was given.
+        range: Concept
+      stop_reason:
+        name: stop_reason
+        description: The Stop Reason indicates why a Condition is no longer valid.
+      provider_id:
+        name: provider_id
+        description: The provider associated with condition record.
+      visit_occurrence_id:
+        name: visit_occurrence_id
+        description: The visit during which the condition occurred.
+        range: VisitOccurrence
+      visit_detail_id:
+        name: visit_detail_id
+        description: The VISIT_DETAIL record during which the condition occurred.
+      condition_source_value:
+        name: condition_source_value
+        description: This field houses the verbatim value from the source data representing
+          the condition that occurred.
+      condition_source_concept_id:
+        name: condition_source_concept_id
+        description: This is the concept representing the condition source value.
+        range: Concept
+      condition_status_source_value:
+        name: condition_status_source_value
+        description: This field houses the verbatim value from the source data representing
+          the condition status.
+
+  Domain:
+    name: Domain
+    annotations:
+      domain:
+        tag: domain
+        value: vocabulary
+    description: The DOMAIN table includes a list of OMOP-defined Domains to which
+      the Concepts of the Standardized Vocabularies can belong.
+    attributes:
+      domain_id:
+        name: domain_id
+        description: A unique key for each domain.
+        identifier: true
+        required: true
+      domain_name:
+        name: domain_name
+        description: The name describing the Domain.
+        required: true
+      domain_concept_id:
+        name: domain_concept_id
+        description: A Concept representing the Domain Concept the DOMAIN record belongs
+          to.
+        range: Concept
+        required: true
+
+  DrugExposure:
+    name: DrugExposure
+    annotations:
+      domain:
+        tag: domain
+        value: clinical
+    description: This table captures records about the exposure to a Drug ingested
+      or otherwise introduced into the body.
+    attributes:
+      drug_exposure_id:
+        name: drug_exposure_id
+        description: The unique key given to records of drug dispensings or administrations
+          for a person.
+        identifier: true
+        required: true
+      person_id:
+        name: person_id
+        description: The PERSON_ID of the PERSON for whom the drug dispensing or administration
+          is recorded.
+        range: Person
+        required: true
+      drug_concept_id:
+        name: drug_concept_id
+        description: This is the standard concept mapped from the source concept id
+          which represents a drug product or molecule.
+        range: Concept
+        required: true
+      drug_exposure_start_date:
+        name: drug_exposure_start_date
+        description: Start date of a prescription or the date on which a Drug administration
+          was recorded.
+        required: true
+      drug_exposure_start_datetime:
+        name: drug_exposure_start_datetime
+      drug_exposure_end_date:
+        name: drug_exposure_end_date
+        description: The day the drug exposure ended for the patient.
+        required: true
+      drug_exposure_end_datetime:
+        name: drug_exposure_end_datetime
+      verbatim_end_date:
+        name: verbatim_end_date
+        description: This is the end date of the drug exposure as it appears in the
+          source data.
+      drug_type_concept_id:
+        name: drug_type_concept_id
+        description: Use the TYPE_CONCEPT_ID to delineate between prescriptions written
+          vs. dispensed vs. medication history.
+        range: Concept
+        required: true
+      stop_reason:
+        name: stop_reason
+        description: The reason a person stopped a medication as it is represented
+          in the source.
+      refills:
+        name: refills
+        description: Intended refills at time of the prescription.
+      quantity:
+        name: quantity
+        description: Total amount dispensed or ordered of ingredient.
+      days_supply:
+        name: days_supply
+        description: The number of days of supply of the medication.
+      sig:
+        name: sig
+        description: The verbatim instruction for the drug as written by the provider.
+      route_concept_id:
+        name: route_concept_id
+        description: The standard CONCEPT_ID that the ROUTE_SOURCE_VALUE maps to.
+        range: Concept
+      lot_number:
+        name: lot_number
+      provider_id:
+        name: provider_id
+        description: The Provider associated with drug record.
+      visit_occurrence_id:
+        name: visit_occurrence_id
+        description: The Visit during which the drug was prescribed, administered or
+          dispensed.
+        range: VisitOccurrence
+      visit_detail_id:
+        name: visit_detail_id
+        description: The VISIT_DETAIL record during which the drug exposure occurred.
+      drug_source_value:
+        name: drug_source_value
+        description: This field houses the verbatim value from the source data representing
+          the drug exposure.
+      drug_source_concept_id:
+        name: drug_source_concept_id
+        description: This is the concept representing the drug source value.
+        range: Concept
+      route_source_value:
+        name: route_source_value
+        description: This field houses the verbatim value from the source data representing
+          the drug route.
+      dose_unit_source_value:
+        name: dose_unit_source_value
+        description: This field houses the verbatim value from the source data representing
+          the dose unit of the drug given.
+
+  Location:
+    name: Location
+    annotations:
+      domain:
+        tag: domain
+        value: infrastructure
+    description: The LOCATION table represents a generic way to capture physical location
+      or address information of Persons and Care Sites.
+    attributes:
+      location_id:
+        name: location_id
+        description: The unique key given to a unique Location.
+        identifier: true
+        required: true
+      address_1:
+        name: address_1
+        description: This is the first line of the address.
+      address_2:
+        name: address_2
+        description: This is the second line of the address.
+      city:
+        name: city
+      state:
+        name: state
+      zip:
+        name: zip
+      county:
+        name: county
+      location_source_value:
+        name: location_source_value
+      country_concept_id:
+        name: country_concept_id
+        description: The Concept Id representing the country.
+        range: Concept
+      country_source_value:
+        name: country_source_value
+        description: The name of the country.
+      latitude:
+        name: latitude
+      longitude:
+        name: longitude
+
+  Note:
+    name: Note
+    annotations:
+      domain:
+        tag: domain
+        value: clinical
+    description: The NOTE table captures unstructured information that was recorded
+      by a provider about a patient in free text notes on a given date.
+    attributes:
+      note_id:
+        name: note_id
+        description: A unique identifier for each note.
+        identifier: true
+        required: true
+      person_id:
+        name: person_id
+        range: Person
+        required: true
+      note_date:
+        name: note_date
+        description: The date the note was recorded.
+        required: true
+      note_datetime:
+        name: note_datetime
+      note_type_concept_id:
+        name: note_type_concept_id
+        description: The provenance of the note.
+        range: Concept
+        required: true
+      note_class_concept_id:
+        name: note_class_concept_id
+        description: A Standard Concept Id representing the HL7 LOINC Document Type
+          Vocabulary classification of the note.
+        range: Concept
+        required: true
+      note_title:
+        name: note_title
+        description: The title of the note.
+      note_text:
+        name: note_text
+        description: The content of the note.
+        required: true
+      encoding_concept_id:
+        name: encoding_concept_id
+        description: This is the Concept representing the character encoding type.
+        range: Concept
+        required: true
+      language_concept_id:
+        name: language_concept_id
+        description: The language of the note.
+        range: Concept
+        required: true
+      provider_id:
+        name: provider_id
+        description: The Provider who wrote the note.
+      visit_occurrence_id:
+        name: visit_occurrence_id
+        description: The Visit during which the note was written.
+        range: VisitOccurrence
+      visit_detail_id:
+        name: visit_detail_id
+        description: The Visit Detail during which the note was written.
+      note_source_value:
+        name: note_source_value
+      note_event_id:
+        name: note_event_id
+        description: If the Note record is related to another record in the database,
+          this field is the primary key of the linked record.
+      note_event_field_concept_id:
+        name: note_event_field_concept_id
+        description: The CONCEPT_ID that identifies which table the primary key of
+          the linked record came from.
+        range: Concept
+
+  ObservationPeriod:
+    name: ObservationPeriod
+    annotations:
+      domain:
+        tag: domain
+        value: clinical
+    description: This table contains records which define spans of time during which
+      Clinical Events that happened to the Person are recorded.
+    attributes:
+      observation_period_id:
+        name: observation_period_id
+        description: A Person can have multiple discrete Observation Periods which
+          are identified by the Observation_Period_Id.
+        identifier: true
+        required: true
+      person_id:
+        name: person_id
+        description: The Person ID of the PERSON record for which the Observation
+          Period is recorded.
+        range: Person
+        required: true
+      observation_period_start_date:
+        name: observation_period_start_date
+        description: Use this date to determine the start date of the Observation
+          Period.
+        required: true
+      observation_period_end_date:
+        name: observation_period_end_date
+        description: Use this date to determine the end date of the period for which
+          we can assume that all events for a Person are recorded.
+        required: true
+      period_type_concept_id:
+        name: period_type_concept_id
+        description: This field can be used to determine the provenance of the Observation
+          Period.
+        range: Concept
+        required: true
+
+  Person:
+    name: Person
+    annotations:
+      domain:
+        tag: domain
+        value: clinical
+    description: This table serves as the central identity management for all Persons
+      in the database.
+    attributes:
+      person_id:
+        name: person_id
+        description: Every person with a different unique identifier is a different
+          person and should be treated independently.
+        identifier: true
+        required: true
+      gender_concept_id:
+        name: gender_concept_id
+        description: This field is meant to capture the biological sex at birth of
+          the Person.
+        range: Concept
+        required: true
+      year_of_birth:
+        name: year_of_birth
+        description: Compute age using year_of_birth.
+        required: true
+      month_of_birth:
+        name: month_of_birth
+      day_of_birth:
+        name: day_of_birth
+      birth_datetime:
+        name: birth_datetime
+      race_concept_id:
+        name: race_concept_id
+        description: This field captures race or ethnic background of the person.
+        range: Concept
+        required: true
+      ethnicity_concept_id:
+        name: ethnicity_concept_id
+        description: This field captures Ethnicity as defined by the OMB.
+        range: Concept
+        required: true
+      location_id:
+        name: location_id
+        description: The location refers to the physical address of the person.
+        range: Location
+      provider_id:
+        name: provider_id
+        description: The Provider refers to the last known primary care provider.
+      care_site_id:
+        name: care_site_id
+        description: The Care Site refers to where the Provider typically provides
+          the primary care.
+      person_source_value:
+        name: person_source_value
+        description: Use this field to link back to persons in the source data.
+      gender_source_value:
+        name: gender_source_value
+        description: This field is used to store the biological sex of the person
+          from the source data.
+      gender_source_concept_id:
+        name: gender_source_concept_id
+        description: Due to the small number of options, this tends to be zero.
+        range: Concept
+      race_source_value:
+        name: race_source_value
+        description: This field is used to store the race of the person from the source
+          data.
+      race_source_concept_id:
+        name: race_source_concept_id
+        description: Due to the small number of options, this tends to be zero.
+        range: Concept
+      ethnicity_source_value:
+        name: ethnicity_source_value
+        description: This field is used to store the ethnicity of the person from
+          the source data.
+      ethnicity_source_concept_id:
+        name: ethnicity_source_concept_id
+        description: Due to the small number of options, this tends to be zero.
+        range: Concept
+
+  Relationship:
+    name: Relationship
+    annotations:
+      domain:
+        tag: domain
+        value: vocabulary
+    description: The RELATIONSHIP table provides a reference list of all types of
+      relationships that can be used to associate any two Concepts.
+    attributes:
+      relationship_id:
+        name: relationship_id
+        description: The type of relationship captured by the relationship record.
+        identifier: true
+        required: true
+      relationship_name:
+        name: relationship_name
+        required: true
+      is_hierarchical:
+        name: is_hierarchical
+        description: Defines whether a relationship defines concepts into classes
+          or hierarchies.
+        required: true
+      defines_ancestry:
+        name: defines_ancestry
+        description: Defines whether a hierarchical relationship contributes to the
+          concept_ancestor table.
+        required: true
+      reverse_relationship_id:
+        name: reverse_relationship_id
+        description: The identifier for the relationship used to define the reverse
+          relationship between two concepts.
+        required: true
+      relationship_concept_id:
+        name: relationship_concept_id
+        description: A foreign key that refers to an identifier in the CONCEPT table
+          for the unique relationship concept.
+        range: Concept
+        required: true
+
+  VisitOccurrence:
+    name: VisitOccurrence
+    annotations:
+      domain:
+        tag: domain
+        value: clinical
+    description: This table contains Events where Persons engage with the healthcare
+      system for a duration of time.
+    attributes:
+      visit_occurrence_id:
+        name: visit_occurrence_id
+        description: Use this to identify unique interactions between a person and
+          the health care system.
+        identifier: true
+        required: true
+      person_id:
+        name: person_id
+        range: Person
+        required: true
+      visit_concept_id:
+        name: visit_concept_id
+        description: This field contains a concept id representing the kind of visit.
+        range: Concept
+        required: true
+      visit_start_date:
+        name: visit_start_date
+        description: For inpatient visits, the start date is typically the admission
+          date.
+        required: true
+      visit_start_datetime:
+        name: visit_start_datetime
+      visit_end_date:
+        name: visit_end_date
+        description: For inpatient visits the end date is typically the discharge
+          date.
+        required: true
+      visit_end_datetime:
+        name: visit_end_datetime
+      visit_type_concept_id:
+        name: visit_type_concept_id
+        description: Use this field to understand the provenance of the visit record.
+        range: Concept
+        required: true
+      provider_id:
+        name: provider_id
+        description: There will only be one provider per visit record.
+      care_site_id:
+        name: care_site_id
+        description: This field provides information about the Care Site where the
+          Visit took place.
+      preceding_visit_occurrence_id:
+        name: preceding_visit_occurrence_id
+        description: Use this field to find the visit that occurred for the person
+          prior to the given visit.
+        range: VisitOccurrence
+      visit_source_value:
+        name: visit_source_value
+        description: This field houses the verbatim value from the source data representing
+          the kind of visit.
+      visit_source_concept_id:
+        name: visit_source_concept_id
+        range: Concept
+      admitted_from_concept_id:
+        name: admitted_from_concept_id
+        description: Use this field to determine where the patient was admitted from.
+        range: Concept
+      admitted_from_source_value:
+        name: admitted_from_source_value
+      discharged_to_concept_id:
+        name: discharged_to_concept_id
+        description: Use this field to determine where the patient was discharged
+          to after a visit.
+        range: Concept
+      discharged_to_source_value:
+        name: discharged_to_source_value
+
+  Vocabulary:
+    name: Vocabulary
+    annotations:
+      domain:
+        tag: domain
+        value: vocabulary
+    description: The VOCABULARY table includes a list of the Vocabularies integrated
+      from various sources or created de novo in OMOP CDM.
+    attributes:
+      vocabulary_id:
+        name: vocabulary_id
+        description: A unique identifier for each Vocabulary, such as ICD9CM, SNOMED,
+          Visit.
+        identifier: true
+        required: true
+      vocabulary_name:
+        name: vocabulary_name
+        description: The name describing the vocabulary.
+        required: true
+      vocabulary_reference:
+        name: vocabulary_reference
+        description: External reference to documentation or available download of
+          the vocabulary.
+      vocabulary_version:
+        name: vocabulary_version
+        description: Version of the Vocabulary as indicated in the source.
+      vocabulary_concept_id:
+        name: vocabulary_concept_id
+        description: A Concept that represents the Vocabulary the VOCABULARY record
+          belongs to.
+        range: Concept
+        required: true
