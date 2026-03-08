@@ -68,6 +68,15 @@ export interface RawLinkMLSchema {
 }
 
 // ---------------------------------------------------------------------------
+// Layout options — controls which engine and direction to use
+// ---------------------------------------------------------------------------
+
+export interface LayoutOptions {
+  engine: 'dagre' | 'elk';
+  direction: 'LR' | 'TB';
+}
+
+// ---------------------------------------------------------------------------
 // ERD graph model — output of the parser, input to Svelte Flow
 // ---------------------------------------------------------------------------
 

@@ -1,0 +1,879 @@
+name: omop-cdm54
+id: https://timformatie.github.io/SEIN-OMOP/omop-cdm54
+imports:
+- linkml:types
+prefixes:
+  linkml:
+    prefix_prefix: linkml
+    prefix_reference: https://w3id.org/linkml/
+  omop_cdm54:
+    prefix_prefix: omop_cdm54
+    prefix_reference: https://timformatie.github.io/SEIN-OMOP/omop-cdm54/
+default_prefix: omop_cdm54
+default_range: string
+classes:
+  CdmSource:
+    name: CdmSource
+    description: The CDM_SOURCE table contains detail about the source database and
+      the process used to transform the data into the OMOP Common Data Model.
+    attributes:
+      cdm_source_name:
+        name: cdm_source_name
+        description: The name of the CDM instance.
+        required: true
+      cdm_source_abbreviation:
+        name: cdm_source_abbreviation
+        description: The abbreviation of the CDM instance.
+        required: true
+      cdm_holder:
+        name: cdm_holder
+        description: The holder of the CDM instance.
+        required: true
+      source_description:
+        name: source_description
+        description: The description of the CDM instance.
+      source_documentation_reference:
+        name: source_documentation_reference
+        description: Refers to a publication or web resource describing the source
+          data
+      cdm_etl_reference:
+        name: cdm_etl_reference
+      source_release_date:
+        name: source_release_date
+        description: The date the data was extracted from the source system. In some
+          systems that is the same as the date the ETL was run. Typically the latest
+          even date in the source is on the source_release_date.
+        required: true
+      cdm_release_date:
+        name: cdm_release_date
+        description: The date the ETL script was completed. Typically this is after
+          the source_release_date.
+        required: true
+      cdm_version:
+        name: cdm_version
+        description: Version of the OMOP CDM used as string. e.g. v5.4
+      cdm_version_concept_id:
+        name: cdm_version_concept_id
+        description: The Concept Id representing the version of the CDM.
+        range: Concept
+        required: true
+      vocabulary_version:
+        name: vocabulary_version
+        description: Version of the OMOP standardised vocabularies loaded
+        required: true
+  ConceptAncestor:
+    name: ConceptAncestor
+    description: The CONCEPT_ANCESTOR table is designed to simplify observational
+      analysis by providing the complete hierarchical relationships between Concepts.
+      Only direct parent-child relationships between Concepts are stored in the CONCEPT_RELATIONSHIP
+      table. To determine higher-level ancestry connections, all individual direct
+      relationships would have to be navigated at analysis time. The CONCEPT_ANCESTOR
+      table includes records for all parent-child relationships, as well as grandparent-grandchild
+      relationships and those of any other level of lineage for Standard or Classification
+      concepts. Using the CONCEPT_ANCESTOR table allows for querying for all descendants
+      of a hierarchical concept, and the other way around. For example, drug ingredients
+      and drug products, beneath them in the hierarchy, are all descendants of a drug
+      class ancestor. This table is entirely derived from the CONCEPT, CONCEPT_RELATIONSHIP,
+      and RELATIONSHIP tables.
+    attributes:
+      ancestor_concept_id:
+        name: ancestor_concept_id
+        description: The Concept Id for the higher-level concept that forms the ancestor
+          in the relationship.
+        range: Concept
+        required: true
+      descendant_concept_id:
+        name: descendant_concept_id
+        description: The Concept Id for the lower-level concept that forms the descendant
+          in the relationship.
+        range: Concept
+        required: true
+      min_levels_of_separation:
+        name: min_levels_of_separation
+        description: The minimum separation in number of levels of hierarchy between
+          ancestor and descendant concepts. This is an attribute that is used to simplify
+          hierarchic analysis.
+        required: true
+      max_levels_of_separation:
+        name: max_levels_of_separation
+        description: The maximum separation in number of levels of hierarchy between
+          ancestor and descendant concepts. This is an attribute that is used to simplify
+          hierarchic analysis.
+        required: true
+  ConceptClass:
+    name: ConceptClass
+    description: The CONCEPT_CLASS table includes semantic categories that reference
+      the source structure of each Vocabulary. Concept Classes represent so-called
+      horizontal (e.g. MedDRA, RxNorm) or vertical levels (e.g. SNOMED) of the vocabulary
+      structure. Vocabularies without any Concept Classes, such as HCPCS, use the
+      vocabulary_id as the Concept Class. This reference table is populated with a
+      single record for each Concept Class, which includes a Concept Class ID and
+      a fully specified Concept Class name.
+    attributes:
+      concept_class_id:
+        name: concept_class_id
+        description: A unique key for each class.
+        identifier: true
+        required: true
+      concept_class_name:
+        name: concept_class_name
+        description: The name describing the Concept Class, e.g. Clinical Finding,
+          Ingredient, etc.
+        required: true
+      concept_class_concept_id:
+        name: concept_class_concept_id
+        description: A Concept that represents the Concept Class.
+        range: Concept
+        required: true
+  ConceptRelation:
+    name: ConceptRelation
+    description: The CONCEPT_RELATIONSHIP table contains records that define relationships
+      between any two Concepts and the nature or type of the relationship. This table
+      captures various types of relationships, including hierarchical, associative,
+      and other semantic connections, enabling comprehensive analysis and interpretation
+      of clinical concepts. Every kind of relationship is defined in the RELATIONSHIP
+      table.
+    attributes:
+      concept_id_1:
+        name: concept_id_1
+        range: Concept
+        required: true
+      concept_id_2:
+        name: concept_id_2
+        range: Concept
+        required: true
+      relationship_id:
+        name: relationship_id
+        description: The relationship between CONCEPT_ID_1 and CONCEPT_ID_2. Please
+          see the Vocabulary Conventions. for more information.
+        range: Relationship
+        required: true
+      valid_start_date:
+        name: valid_start_date
+        description: The date when the relationship is first recorded.
+        required: true
+      valid_end_date:
+        name: valid_end_date
+        description: The date when the relationship is invalidated.
+        required: true
+      invalid_reason:
+        name: invalid_reason
+        description: Reason the relationship was invalidated. Possible values are
+          ‘D’ (deleted), ‘U’ (updated) or NULL.
+  ConceptSynonym:
+    name: ConceptSynonym
+    description: The CONCEPT_SYNONYM table captures alternative terms, synonyms, and
+      translations of Concept Name into various languages linked to specific concepts,
+      providing users with a comprehensive view of how Concepts may be expressed or
+      referenced.
+    attributes:
+      concept_id:
+        name: concept_id
+        range: Concept
+        required: true
+      concept_synonym_name:
+        name: concept_synonym_name
+        required: true
+      language_concept_id:
+        name: language_concept_id
+        range: Concept
+        required: true
+  Concept:
+    name: Concept
+    description: The Standardized Vocabularies contains records, or Concepts, that
+      uniquely identify each fundamental unit of meaning used to express clinical
+      information in all domain tables of the CDM. Concepts are derived from vocabularies,
+      which represent clinical information across a domain (e.g. conditions, drugs,
+      procedures) through the use of codes and associated descriptions. Some Concepts
+      are designated Standard Concepts, meaning these Concepts can be used as normative
+      expressions of a clinical entity within the OMOP Common Data Model and standardized
+      analytics. Each Standard Concept belongs to one Domain, which defines the location
+      where the Concept would be expected to occur within the data tables of the CDM.
+      Concepts can represent broad categories (‘Cardiovascular disease’), detailed
+      clinical elements (‘Myocardial infarction of the anterolateral wall’), or modifying
+      characteristics and attributes that define Concepts at various levels of detail
+      (severity of a disease, associated morphology, etc.). Records in the Standardized
+      Vocabularies tables are derived from national or international vocabularies
+      such as SNOMED-CT, RxNorm, and LOINC, or custom OMOP Concepts defined to cover
+      various aspects of observational data analysis.
+    attributes:
+      concept_id:
+        name: concept_id
+        description: A unique identifier for each Concept across all domains.
+        identifier: true
+        required: true
+      concept_name:
+        name: concept_name
+        description: An unambiguous, meaningful and descriptive name for the Concept.
+        required: true
+      domain_id:
+        name: domain_id
+        description: A foreign key to the DOMAIN table the Concept belongs to.
+        range: Domain
+        required: true
+      vocabulary_id:
+        name: vocabulary_id
+        description: A foreign key to the VOCABULARY table indicating from which source
+          the Concept has been adapted.
+        range: Vocabulary
+        required: true
+      concept_class_id:
+        name: concept_class_id
+        description: The attribute or concept class of the Concept. Examples are ‘Clinical
+          Drug’, ‘Ingredient’, ‘Clinical Finding’ etc.
+        range: ConceptClass
+        required: true
+      standard_concept:
+        name: standard_concept
+        description: This flag determines where a Concept is a Standard Concept, i.e.
+          is used in the data, a Classification Concept, or a non-standard Source
+          Concept. The allowable values are ‘S’ (Standard Concept) and ‘C’ (Classification
+          Concept), otherwise the content is NULL.
+      concept_code:
+        name: concept_code
+        description: The concept code represents the identifier of the Concept in
+          the source vocabulary, such as SNOMED-CT concept IDs, RxNorm RXCUIs etc.
+          Note that concept codes are not unique across vocabularies.
+        required: true
+      valid_start_date:
+        name: valid_start_date
+        description: The date when the Concept was first recorded. The default value
+          is 1-Jan-1970, meaning, the Concept has no (known) date of inception.
+        required: true
+      valid_end_date:
+        name: valid_end_date
+        description: The date when the Concept became invalid because it was deleted
+          or superseded (updated) by a new concept. The default value is 31-Dec-2099,
+          meaning, the Concept is valid until it becomes deprecated.
+        required: true
+      invalid_reason:
+        name: invalid_reason
+        description: Reason the Concept was invalidated. Possible values are D (deleted),
+          U (replaced with an update) or NULL when valid_end_date has the default
+          value.
+  ConditionOccurrence:
+    name: ConditionOccurrence
+    description: REWRITE THIS This table captures records about the exposure to a
+      Drug ingested or otherwise introduced into the body. A Drug is a biochemical
+      substance formulated in such a way that when administered to a Person it will
+      exert a certain biochemical effect on the metabolism. Drugs include prescription
+      and over-the-counter medicines, vaccines, and large-molecule biologic therapies.
+      Radiological devices ingested or applied locally do not count as Drugs.
+    attributes:
+      condition_occurrence_id:
+        name: condition_occurrence_id
+        description: The unique key given to a condition record for a person.
+        identifier: true
+        required: true
+      person_id:
+        name: person_id
+        description: The PERSON_ID of the PERSON for whom the condition is recorded.
+        range: Person
+        required: true
+      condition_concept_id:
+        name: condition_concept_id
+        description: The CONDITION_CONCEPT_ID field is recommended for primary use
+          in analyses, and must be used for network studies. This is the standard
+          concept mapped from the source value which represents a condition
+        range: Concept
+        required: true
+      condition_start_date:
+        name: condition_start_date
+        description: Use this date to determine the start date of the condition
+        required: true
+      condition_start_datetime:
+        name: condition_start_datetime
+      condition_end_date:
+        name: condition_end_date
+        description: Use this date to determine the end date of the condition
+      condition_end_datetime:
+        name: condition_end_datetime
+      condition_type_concept_id:
+        name: condition_type_concept_id
+        description: This field can be used to determine the provenance of the Condition
+          record, as in whether the condition was from an EHR system, insurance claim,
+          registry, or other sources.
+        range: Concept
+        required: true
+      condition_status_concept_id:
+        name: condition_status_concept_id
+        description: This concept represents the point during the visit the diagnosis
+          was given (admitting diagnosis, final diagnosis), whether the diagnosis
+          was determined due to laboratory findings, if the diagnosis was exclusionary,
+          or if it was a preliminary diagnosis, among others.
+        range: Concept
+      stop_reason:
+        name: stop_reason
+        description: The Stop Reason indicates why a Condition is no longer valid
+          with respect to the purpose within the source data. Note that a Stop Reason
+          does not necessarily imply that the condition is no longer occurring.
+      provider_id:
+        name: provider_id
+        description: The provider associated with condition record, e.g. the provider
+          who made the diagnosis or the provider who recorded the symptom.
+      visit_occurrence_id:
+        name: visit_occurrence_id
+        description: The visit during which the condition occurred.
+        range: VisitOccurrence
+      visit_detail_id:
+        name: visit_detail_id
+        description: The VISIT_DETAIL record during which the condition occurred.
+          For example, if the person was in the ICU at the time of the diagnosis the
+          VISIT_OCCURRENCE record would reflect the overall hospital stay and the
+          VISIT_DETAIL record would reflect the ICU stay during the hospital visit.
+      condition_source_value:
+        name: condition_source_value
+        description: This field houses the verbatim value from the source data epresenting
+          the condition that occurred. For example, this could be an ICD10 or Read
+          code.
+      condition_source_concept_id:
+        name: condition_source_concept_id
+        description: This is the concept representing the condition source value and
+          may not necessarily be standard. This field is discouraged from use in analysis
+          because it is not required to contain Standard Concepts that are used across
+          the OHDSI community, and should only be used when Standard Concepts do not
+          adequately represent the source detail for the Condition necessary for a
+          given analytic use case. Consider using CONDITION_CONCEPT_ID instead to
+          enable standardized analytics that can be consistent across the network.
+        range: Concept
+      condition_status_source_value:
+        name: condition_status_source_value
+        description: This field houses the verbatim value from the source data representing
+          the condition status.
+  Domain:
+    name: Domain
+    description: The DOMAIN table includes a list of OMOP-defined Domains to which
+      the Concepts of the Standardized Vocabularies can belong. A Domain represents
+      a clinical definition whereby we assign matching Concepts for the standardized
+      fields in the CDM tables. For example, the Condition Domain contains Concepts
+      that describe a patient condition, and these Concepts can only be used in the
+      condition_concept_id field of the CONDITION_OCCURRENCE and CONDITION_ERA tables.
+      This reference table is populated with a single record for each Domain, including
+      a Domain ID and a descriptive name for every Domain.
+    attributes:
+      domain_id:
+        name: domain_id
+        description: A unique key for each domain.
+        identifier: true
+        required: true
+      domain_name:
+        name: domain_name
+        description: The name describing the Domain, e.g. Condition, Procedure, Measurement
+          etc.
+        required: true
+      domain_concept_id:
+        name: domain_concept_id
+        description: A Concept representing the Domain Concept the DOMAIN record belongs
+          to.
+        range: Concept
+        required: true
+  DrugExposure:
+    name: DrugExposure
+    description: This table captures records about the exposure to a Drug ingested
+      or otherwise introduced into the body. A Drug is a biochemical substance formulated
+      in such a way that when administered to a Person it will exert a certain biochemical
+      effect on the metabolism. Drugs include prescription and over-the-counter medicines,
+      vaccines, and large-molecule biologic therapies. Radiological devices ingested
+      or applied locally do not count as Drugs.
+    attributes:
+      drug_exposure_id:
+        name: drug_exposure_id
+        description: The unique key given to records of drug dispensings or administrations
+          for a person.
+        identifier: true
+        required: true
+      person_id:
+        name: person_id
+        description: The PERSON_ID of the PERSON for whom the drug dispensing or administration
+          is recorded.
+        range: Person
+        required: true
+      drug_concept_id:
+        name: drug_concept_id
+        description: This is the standard concept mapped from the source concept id
+          which represents a drug product or molecule otherwise introduced to the
+          body.
+        range: Concept
+        required: true
+      drug_exposure_start_date:
+        name: drug_exposure_start_date
+        description: Start date of a prescription, the date a prescription was filled,
+          or the date on which a Drug administration was recorded.
+        required: true
+      drug_exposure_start_datetime:
+        name: drug_exposure_start_datetime
+      drug_exposure_end_date:
+        name: drug_exposure_end_date
+        description: The DRUG_EXPOSURE_END_DATE denotes the day the drug exposure
+          ended for the patient.
+        required: true
+      drug_exposure_end_datetime:
+        name: drug_exposure_end_datetime
+      verbatim_end_date:
+        name: verbatim_end_date
+        description: This is the end date of the drug exposure as it appears in the
+          source data, if it is given
+      drug_type_concept_id:
+        name: drug_type_concept_id
+        description: You can use the TYPE_CONCEPT_ID to delineate between prescriptions
+          written vs. prescriptions dispensed vs. medication history vs. patient-reported
+          exposure, etc.
+        range: Concept
+        required: true
+      stop_reason:
+        name: stop_reason
+        description: The reason a person stopped a medication as it is represented
+          in the source.
+      refills:
+        name: refills
+        description: This is only filled in when the record is coming from a prescription
+          written this field is meant to represent intended refills at time of the
+          prescription.
+      quantity:
+        name: quantity
+        description: If liquid, quantity stands for the total amount dispensed or
+          ordered of ingredient. For clinical drugs with fixed dose forms (tablets
+          etc.) the quantity is the number of units/tablets/capsules prescribed or
+          dispensed (can be partial, but then only 1/2 or 1/3, not 0.01). Clinical
+          drugs with divisible dose forms (injections) the quantity is the amount
+          of ingredient the patient got.
+      days_supply:
+        name: days_supply
+        description: The number of days of supply of the medication as recorded in
+          the original prescription or dispensing record.
+      sig:
+        name: sig
+        description: This is the verbatim instruction for the drug as written by the
+          provider.
+      route_concept_id:
+        name: route_concept_id
+        description: The standard CONCEPT_ID that the ROUTE_SOURCE_VALUE maps to in
+          the route domain.
+        range: Concept
+      lot_number:
+        name: lot_number
+      provider_id:
+        name: provider_id
+        description: The Provider associated with drug record, e.g. the provider who
+          wrote the prescription or the provider who administered the drug.
+      visit_occurrence_id:
+        name: visit_occurrence_id
+        description: The Visit during which the drug was prescribed, administered
+          or dispensed.
+        range: VisitOccurrence
+      visit_detail_id:
+        name: visit_detail_id
+        description: The VISIT_DETAIL record during which the drug exposure occurred.
+      drug_source_value:
+        name: drug_source_value
+        description: This field houses the verbatim value from the source data representing
+          the drug exposure that occurred.
+      drug_source_concept_id:
+        name: drug_source_concept_id
+        description: This is the concept representing the drug source value and may
+          not necessarily be standard.
+        range: Concept
+      route_source_value:
+        name: route_source_value
+        description: This field houses the verbatim value from the source data representing
+          the drug route.
+      dose_unit_source_value:
+        name: dose_unit_source_value
+        description: This field houses the verbatim value from the source data representing
+          the dose unit of the drug given.
+  Location:
+    name: Location
+    description: The LOCATION table represents a generic way to capture physical location
+      or address information of Persons and Care Sites.
+    attributes:
+      location_id:
+        name: location_id
+        description: The unique key given to a unique Location.
+        identifier: true
+        required: true
+      address_1:
+        name: address_1
+        description: This is the first line of the address.
+      address_2:
+        name: address_2
+        description: This is the second line of the address
+      city:
+        name: city
+      state:
+        name: state
+      zip:
+        name: zip
+      county:
+        name: county
+      location_source_value:
+        name: location_source_value
+      country_concept_id:
+        name: country_concept_id
+        description: The Concept Id representing the country. Values should conform
+          to the Geography domain.
+        range: Concept
+      country_source_value:
+        name: country_source_value
+        description: The name of the country.
+      latitude:
+        name: latitude
+      longitude:
+        name: longitude
+  Note:
+    name: Note
+    description: The NOTE table captures unstructured information that was recorded
+      by a provider about a patient in free text (in ASCII, or preferably in UTF8
+      format) notes on a given date. The type of note_text is CLOB or varchar(MAX)
+      depending on RDBMS.
+    attributes:
+      note_id:
+        name: note_id
+        description: A unique identifier for each note.
+        identifier: true
+        required: true
+      person_id:
+        name: person_id
+        range: Person
+        required: true
+      note_date:
+        name: note_date
+        description: The date the note was recorded.
+        required: true
+      note_datetime:
+        name: note_datetime
+      note_type_concept_id:
+        name: note_type_concept_id
+        description: The provenance of the note. Most likely this will be EHR.
+        range: Concept
+        required: true
+      note_class_concept_id:
+        name: note_class_concept_id
+        description: A Standard Concept Id representing the HL7 LOINC Document Type
+          Vocabulary classification of the note.
+        range: Concept
+        required: true
+      note_title:
+        name: note_title
+        description: The title of the note.
+      note_text:
+        name: note_text
+        description: The content of the note.
+        required: true
+      encoding_concept_id:
+        name: encoding_concept_id
+        description: This is the Concept representing the character encoding type.
+        range: Concept
+        required: true
+      language_concept_id:
+        name: language_concept_id
+        description: The language of the note.
+        range: Concept
+        required: true
+      provider_id:
+        name: provider_id
+        description: The Provider who wrote the note.
+      visit_occurrence_id:
+        name: visit_occurrence_id
+        description: The Visit during which the note was written.
+        range: VisitOccurrence
+      visit_detail_id:
+        name: visit_detail_id
+        description: The Visit Detail during which the note was written.
+      note_source_value:
+        name: note_source_value
+      note_event_id:
+        name: note_event_id
+        description: If the Note record is related to another record in the database,
+          this field is the primary key of the linked record.
+      note_event_field_concept_id:
+        name: note_event_field_concept_id
+        description: If the Note record is related to another record in the database,
+          this field is the CONCEPT_ID that identifies which table the primary key
+          of the linked record came from.
+        range: Concept
+  ObservationPeriod:
+    name: ObservationPeriod
+    description: This table contains records which define spans of time during which
+      two conditions are expected to hold (i) Clinical Events that happened to the
+      Person are recorded in the Event tables, and (ii) absence of records indicate
+      such Events did not occur during this span of time.
+    attributes:
+      observation_period_id:
+        name: observation_period_id
+        description: A Person can have multiple discrete Observation Periods which
+          are identified by the Observation_Period_Id.
+        identifier: true
+        required: true
+      person_id:
+        name: person_id
+        description: The Person ID of the PERSON record for which the Observation
+          Period is recorded.
+        range: Person
+        required: true
+      observation_period_start_date:
+        name: observation_period_start_date
+        description: Use this date to determine the start date of the Observation
+          Period.
+        required: true
+      observation_period_end_date:
+        name: observation_period_end_date
+        description: Use this date to determine the end date of the period for which
+          we can assume that all events for a Person are recorded.
+        required: true
+      period_type_concept_id:
+        name: period_type_concept_id
+        description: This field can be used to determine the provenance of the Observation
+          Period as in whether the period was determined from an insurance enrollment
+          file, EHR healthcare encounters, or other sources.
+        range: Concept
+        required: true
+  Person:
+    name: Person
+    description: This table serves as the central identity management for all Persons
+      in the database. It contains records that uniquely identify each person or patient,
+      and some demographic information.
+    attributes:
+      person_id:
+        name: person_id
+        description: It is assumed that every person with a different unique identifier
+          is in fact a different person and should be treated independently.
+        identifier: true
+        required: true
+      gender_concept_id:
+        name: gender_concept_id
+        description: This field is meant to capture the biological sex at birth of
+          the Person. This field should not be used to study gender identity issues.
+        range: Concept
+        required: true
+      year_of_birth:
+        name: year_of_birth
+        description: Compute age using year_of_birth.
+        required: true
+      month_of_birth:
+        name: month_of_birth
+      day_of_birth:
+        name: day_of_birth
+      birth_datetime:
+        name: birth_datetime
+      race_concept_id:
+        name: race_concept_id
+        description: This field captures race or ethnic background of the person.
+        range: Concept
+        required: true
+      ethnicity_concept_id:
+        name: ethnicity_concept_id
+        description: This field captures Ethnicity as defined by the Office of Management
+          and Budget (OMB) of the US Government it distinguishes only between “Hispanic”
+          and “Not Hispanic”. Races and ethnic backgrounds are not stored here.
+        range: Concept
+        required: true
+      location_id:
+        name: location_id
+        description: The location refers to the physical address of the person. This
+          field should capture the last known location of the person.
+        range: Location
+      provider_id:
+        name: provider_id
+        description: The Provider refers to the last known primary care provider (General
+          Practitioner).
+      care_site_id:
+        name: care_site_id
+        description: The Care Site refers to where the Provider typically provides
+          the primary care.
+      person_source_value:
+        name: person_source_value
+        description: Use this field to link back to persons in the source data. This
+          is typically used for error checking of ETL logic.
+      gender_source_value:
+        name: gender_source_value
+        description: This field is used to store the biological sex of the person
+          from the source data. It is not intended for use in standard analytics but
+          for reference only.
+      gender_source_concept_id:
+        name: gender_source_concept_id
+        description: Due to the small number of options, this tends to be zero.
+        range: Concept
+      race_source_value:
+        name: race_source_value
+        description: This field is used to store the race of the person from the source
+          data. It is not intended for use in standard analytics but for reference
+          only.
+      race_source_concept_id:
+        name: race_source_concept_id
+        description: Due to the small number of options, this tends to be zero.
+        range: Concept
+      ethnicity_source_value:
+        name: ethnicity_source_value
+        description: This field is used to store the ethnicity of the person from
+          the source data. It is not intended for use in standard analytics but for
+          reference only.
+      ethnicity_source_concept_id:
+        name: ethnicity_source_concept_id
+        description: Due to the small number of options, this tends to be zero.
+        range: Concept
+  Relationship:
+    name: Relationship
+    description: The RELATIONSHIP table provides a reference list of all types of
+      relationships that can be used to associate any two Concepts in the CONCEPT_RELATIONSHIP
+      table, the respective reverse relationships, and their hierarchical characteristics.
+      Note, that Concepts representing relationships between the clinical facts, used
+      for filling in the FACT_RELATIONSHIP table are stored in the CONCEPT table and
+      belong to the Relationship Domain.
+    attributes:
+      relationship_id:
+        name: relationship_id
+        description: The type of relationship captured by the relationship record.
+        identifier: true
+        required: true
+      relationship_name:
+        name: relationship_name
+        required: true
+      is_hierarchical:
+        name: is_hierarchical
+        description: Defines whether a relationship defines concepts into classes
+          or hierarchies. Values are 1 for hierarchical relationship or 0 if not.
+        required: true
+      defines_ancestry:
+        name: defines_ancestry
+        description: Defines whether a hierarchical relationship contributes to the
+          concept_ancestor table. These are subsets of the hierarchical relationships.
+          Valid values are 1 or 0.
+        required: true
+      reverse_relationship_id:
+        name: reverse_relationship_id
+        description: The identifier for the relationship used to define the reverse
+          relationship between two concepts.
+        required: true
+      relationship_concept_id:
+        name: relationship_concept_id
+        description: A foreign key that refers to an identifier in the CONCEPT table
+          for the unique relationship concept.
+        range: Concept
+        required: true
+  VisitOccurrence:
+    name: VisitOccurrence
+    description: This table contains Events where Persons engage with the healthcare
+      system for a duration of time. They are often also called “Encounters”. Visits
+      are defined by a configuration of circumstances under which they occur, such
+      as (i) whether the patient comes to a healthcare institution, the other way
+      around, or the interaction is remote, (ii) whether and what kind of trained
+      medical staff is delivering the service during the Visit, and (iii) whether
+      the Visit is transient or for a longer period involving a stay in bed.
+    attributes:
+      visit_occurrence_id:
+        name: visit_occurrence_id
+        description: Use this to identify unique interactions between a person and
+          the health care system. This identifier links across the other CDM event
+          tables to associate events with a visit.
+        identifier: true
+        required: true
+      person_id:
+        name: person_id
+        range: Person
+        required: true
+      visit_concept_id:
+        name: visit_concept_id
+        description: This field contains a concept id representing the kind of visit,
+          like inpatient or outpatient. All concepts in this field should be standard
+          and belong to the Visit domain.
+        range: Concept
+        required: true
+      visit_start_date:
+        name: visit_start_date
+        description: For inpatient visits, the start date is typically the admission
+          date. For outpatient visits the start date and end date will be the same.
+        required: true
+      visit_start_datetime:
+        name: visit_start_datetime
+      visit_end_date:
+        name: visit_end_date
+        description: For inpatient visits the end date is typically the discharge
+          date. If a Person is still an inpatient in the hospital at the time of the
+          data extract and does not have a visit_end_date, then set the visit_end_date
+          to the date of the data pull.
+        required: true
+      visit_end_datetime:
+        name: visit_end_datetime
+        description: If a Person is still an inpatient in the hospital at the time
+          of the data extract and does not have a visit_end_datetime, then set the
+          visit_end_datetime to the datetime of the data pull.
+      visit_type_concept_id:
+        name: visit_type_concept_id
+        description: Use this field to understand the provenance of the visit record,
+          or where the record comes from.
+        range: Concept
+        required: true
+      provider_id:
+        name: provider_id
+        description: There will only be one provider per visit record and the ETL
+          document should clearly state how they were chosen (attending, admitting,
+          etc.). If there are multiple providers associated with a visit in the source,
+          this can be reflected in the event tables (CONDITION_OCCURRENCE, PROCEDURE_OCCURRENCE,
+          etc.) or in the VISIT_DETAIL table.
+      care_site_id:
+        name: care_site_id
+        description: This field provides information about the Care Site where the
+          Visit took place.
+      preceding_visit_occurrence_id:
+        name: preceding_visit_occurrence_id
+        description: Use this field to find the visit that occurred for the person
+          prior to the given visit. There could be a few days or a few years in between.
+        range: VisitOccurrence
+      visit_source_value:
+        name: visit_source_value
+        description: This field houses the verbatim value from the source data representing
+          the kind of visit that took place (inpatient, outpatient, emergency, etc.)
+      visit_source_concept_id:
+        name: visit_source_concept_id
+        range: Concept
+      admitted_from_concept_id:
+        name: admitted_from_concept_id
+        description: Use this field to determine where the patient was admitted from.
+          This concept is part of the visit domain and can indicate if a patient was
+          admitted to the hospital from a long-term care facility, for example.
+        range: Concept
+      admitted_from_source_value:
+        name: admitted_from_source_value
+      discharged_to_concept_id:
+        name: discharged_to_concept_id
+        description: Use this field to determine where the patient was discharged
+          to after a visit. This concept is part of the visit domain and can indicate
+          if a patient was transferred to another hospital or sent to a long-term
+          care facility, for example. It is assumed that a person is discharged to
+          home therefore there is not a standard concept id for “home”. Use concept
+          id = 0 when a person is discharged to home.
+        range: Concept
+      discharged_to_source_value:
+        name: discharged_to_source_value
+  Vocabulary:
+    name: Vocabulary
+    description: The VOCABULARY table includes a list of the Vocabularies integrated
+      from various sources or created de novo in OMOP CDM. This reference table contains
+      a single record for each Vocabulary and includes a descriptive name and other
+      associated attributes for the Vocabulary.
+    attributes:
+      vocabulary_id:
+        name: vocabulary_id
+        description: A unique identifier for each Vocabulary, such as ICD9CM, SNOMED,
+          Visit.
+        identifier: true
+        required: true
+      vocabulary_name:
+        name: vocabulary_name
+        description: The name describing the vocabulary, for example, International
+          Classification of Diseases, Ninth Revision, Clinical Modification, Volume
+          1 and 2 (NCHS) etc.
+        required: true
+      vocabulary_reference:
+        name: vocabulary_reference
+        description: External reference to documentation or available download of
+          the about the vocabulary.
+      vocabulary_version:
+        name: vocabulary_version
+        description: Version of the Vocabulary as indicated in the source.
+      vocabulary_concept_id:
+        name: vocabulary_concept_id
+        description: A Concept that represents the Vocabulary the VOCABULARY record
+          belongs to.
+        range: Concept
+        required: true

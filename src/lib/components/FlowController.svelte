@@ -8,12 +8,14 @@
     nodes: Node[];
     onpanned: () => void;             // called after pan so parent can clear panTarget
     onhighlight: (update: Node[]) => void;  // returns updated nodes array
+    fitViewTrigger: number;           // increment to trigger fitView
   }
 
-  let { panTarget, nodes, onpanned, onhighlight }: Props = $props();
+  let { panTarget, nodes, onpanned, onhighlight, fitViewTrigger }: Props = $props();
 
-  const { setCenter, getNode } = useSvelteFlow();
+  const { setCenter, getNode, fitView } = useSvelteFlow();
 
+  // Pan + highlight on search select
   $effect(() => {
     if (!panTarget) return;
 
@@ -47,5 +49,12 @@
     }, 1500);
 
     onpanned();
+  });
+
+  // Fit view after layout engine change
+  $effect(() => {
+    if (fitViewTrigger === 0) return;
+    // Small delay to let Svelte Flow settle the new node positions
+    setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 50);
   });
 </script>

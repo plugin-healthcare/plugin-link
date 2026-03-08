@@ -4,6 +4,7 @@
     SvelteFlow,
     Background,
     Controls,
+    ControlButton,
     MiniMap,
     type Node,
     type Edge,
@@ -16,39 +17,66 @@
 
   import { loadDefaultSchema } from '$lib/linkml';
   import { buildGraph } from '$lib/layout';
-  import type { NormalizedSchema } from '$lib/types';
+  import type { NormalizedSchema, LayoutOptions } from '$lib/types';
 
   // ---------------------------------------------------------------------------
   // Node types registration
   // ---------------------------------------------------------------------------
-  const nodeTypes = {
-    table: TableNode,
-  };
+  const nodeTypes = { table: TableNode };
 
   // ---------------------------------------------------------------------------
   // State
   // ---------------------------------------------------------------------------
   let schema = $state<NormalizedSchema | null>(null);
   let loadError = $state('');
-
-  // Collapsed nodes — keyed by class name
   let collapsed = $state<Set<string>>(new Set());
 
-  // Svelte Flow reactive nodes/edges (use $state.raw for performance)
+  // Svelte Flow reactive nodes/edges ($state.raw for performance)
   let nodes = $state.raw<Node[]>([]);
   let edges = $state.raw<Edge[]>([]);
 
-  // classId to pan/highlight, set by search, cleared by FlowController after use
+  // Layout options
+  let layoutOptions = $state<LayoutOptions>({ engine: 'dagre', direction: 'LR' });
+  let layoutLoading = $state(false);
+
+  // Incremented after layout completes to trigger fitView inside FlowController
+  let fitViewTrigger = $state(0);
+
+  // Pan target set by search, cleared by FlowController after use
   let panTarget = $state<string | null>(null);
 
   // ---------------------------------------------------------------------------
-  // Derived: rebuild graph whenever schema or collapsed set changes
+  // Rebuild graph whenever schema, collapsed, or layoutOptions change (async)
   // ---------------------------------------------------------------------------
   $effect(() => {
     if (!schema) return;
-    const result = buildGraph(schema, collapsed);
-    nodes = result.nodes;
-    edges = result.edges;
+
+    // Capture reactive dependencies before entering async context
+    const s = schema;
+    const c = collapsed;
+    const opts = layoutOptions;
+
+    let cancelled = false;
+
+    (async () => {
+      layoutLoading = true;
+      try {
+        const result = await buildGraph(s, c, opts);
+        if (!cancelled) {
+          nodes = result.nodes;
+          edges = result.edges;
+          fitViewTrigger += 1;
+        }
+      } catch (e) {
+        if (!cancelled) {
+          loadError = `Layout failed: ${(e as Error).message}`;
+        }
+      } finally {
+        if (!cancelled) layoutLoading = false;
+      }
+    })();
+
+    return () => { cancelled = true; };
   });
 
   // ---------------------------------------------------------------------------
@@ -72,10 +100,29 @@
   onMount(loadDefault);
 
   // ---------------------------------------------------------------------------
-  // Search: set the pan target — FlowController handles the actual pan
+  // Search: set pan target — FlowController handles the pan
   // ---------------------------------------------------------------------------
   function handleSearchSelect(classId: string) {
     panTarget = classId;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Layout button helpers
+  // ---------------------------------------------------------------------------
+  const LAYOUT_BUTTONS: Array<{ engine: LayoutOptions['engine']; direction: LayoutOptions['direction']; label: string; title: string }> = [
+    { engine: 'dagre', direction: 'LR', label: 'D→', title: 'Dagre — left to right' },
+    { engine: 'dagre', direction: 'TB', label: 'D↓', title: 'Dagre — top to bottom' },
+    { engine: 'elk',   direction: 'LR', label: 'E→', title: 'ELK — left to right' },
+    { engine: 'elk',   direction: 'TB', label: 'E↓', title: 'ELK — top to bottom' },
+  ];
+
+  function isActive(btn: typeof LAYOUT_BUTTONS[number]) {
+    return layoutOptions.engine === btn.engine && layoutOptions.direction === btn.direction;
+  }
+
+  function selectLayout(btn: typeof LAYOUT_BUTTONS[number]) {
+    if (layoutLoading) return;
+    layoutOptions = { engine: btn.engine, direction: btn.direction };
   }
 
   // ---------------------------------------------------------------------------
@@ -86,7 +133,6 @@
 </script>
 
 <div class="app">
-  <!-- Main canvas area fills full viewport -->
   <div class="canvas-wrap">
     <!-- Top bar -->
     <div class="topbar">
@@ -123,17 +169,32 @@
         <FlowController
           {panTarget}
           {nodes}
+          {fitViewTrigger}
           onpanned={() => { panTarget = null; }}
           onhighlight={(updated) => { nodes = updated; }}
         />
         <Background />
-        <Controls />
-        <MiniMap
-          nodeColor={() => '#475569'}
-          nodeStrokeWidth={3}
-          zoomable
-          pannable
-        />
+        <Controls>
+          {#snippet children()}
+            <!-- Separator -->
+            <div class="ctrl-sep" role="separator"></div>
+            {#each LAYOUT_BUTTONS as btn}
+              <ControlButton
+                title={btn.title}
+                onclick={() => selectLayout(btn)}
+                disabled={layoutLoading}
+                class={isActive(btn) ? 'ctrl-btn-active' : ''}
+              >
+                {#if layoutLoading && isActive(btn)}
+                  <span class="ctrl-spin">⟳</span>
+                {:else}
+                  {btn.label}
+                {/if}
+              </ControlButton>
+            {/each}
+          {/snippet}
+        </Controls>
+        <MiniMap nodeColor={() => '#475569'} nodeStrokeWidth={3} zoomable pannable />
       </SvelteFlow>
     {:else if schema && nodes.length === 0}
       <div class="empty-state">
@@ -231,6 +292,24 @@
     flex: 1;
   }
 
+  /* Layout buttons inside Controls */
+  .ctrl-sep {
+    width: 100%;
+    height: 1px;
+    background: var(--xy-controls-button-border-color, #eee);
+    margin: 2px 0;
+  }
+
+  :global(.ctrl-btn-active) {
+    background: #475569 !important;
+    color: #fff !important;
+  }
+
+  .ctrl-spin {
+    display: inline-block;
+    animation: spin 0.8s linear infinite;
+  }
+
   .empty-state,
   .loading-state {
     flex: 1;
@@ -250,6 +329,6 @@
 
   @keyframes spin {
     from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    to   { transform: rotate(360deg); }
   }
 </style>
