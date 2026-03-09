@@ -1,6 +1,6 @@
 [package]
 name = "plugin-link"
-version = "0.0.1"
+version = "0.1.1"
 description = "plugin-link desktop app"
 authors = []
 edition = "2021"
