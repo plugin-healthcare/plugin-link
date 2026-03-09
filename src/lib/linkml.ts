@@ -23,6 +23,25 @@ import type {
 } from './types';
 
 // ---------------------------------------------------------------------------
+// Annotation helper — handles both compact (scalar) and expanded ({tag,value}) forms
+// ---------------------------------------------------------------------------
+
+/**
+ * Read a LinkML annotation value in either form:
+ *   compact:  domain: clinical          → annotation is the string "clinical"
+ *   expanded: domain: {tag: domain, value: clinical} → annotation.value is "clinical"
+ */
+function readAnnotation(
+  annotation: { tag: string; value: unknown } | string | number | boolean | null | undefined
+): string | undefined {
+  if (annotation == null) return undefined;
+  if (typeof annotation === 'object') {
+    return annotation.value != null ? String(annotation.value) : undefined;
+  }
+  return String(annotation);
+}
+
+// ---------------------------------------------------------------------------
 // Primitive type set (ranges that are NOT foreign keys)
 // ---------------------------------------------------------------------------
 
@@ -181,9 +200,7 @@ function parseRawLinkML(raw: RawLinkMLSchema): NormalizedSchema {
       name: className,
       description: String(classDef.description ?? ''),
       slots,
-      domain: classDef.annotations?.domain?.value != null
-        ? String(classDef.annotations.domain.value)
-        : undefined,
+      domain: readAnnotation(classDef.annotations?.domain),
     };
   }
 

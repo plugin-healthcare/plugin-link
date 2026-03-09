@@ -15,880 +15,636 @@ classes:
   AdmissionOrigins:
     name: AdmissionOrigins
     annotations:
-      source_table:
-        tag: source_table
-        value: opname_herkomst
+      source_table: opname_herkomst
     description: 'Staging model for HiX source table: opname_herkomst'
     attributes:
       admission_origin_id:
         name: admission_origin_id
         annotations:
-          source_column:
-            tag: source_column
-            value: CODE
+          source_column: CODE
         identifier: true
         range: integer
       admission_origin_description:
         name: admission_origin_description
         annotations:
-          source_column:
-            tag: source_column
-            value: OMSCHR
+          source_column: OMSCHR
         range: string
   AdmissionTypes:
     name: AdmissionTypes
     annotations:
-      source_table:
-        tag: source_table
-        value: opname_opntype1
+      source_table: opname_opntype1
     description: 'Staging model for HiX source table: opname_opntype1'
     attributes:
       admission_type_id:
         name: admission_type_id
         annotations:
-          source_column:
-            tag: source_column
-            value: CODE
+          source_column: CODE
         identifier: true
         range: integer
       admission_type_description:
         name: admission_type_description
         annotations:
-          source_column:
-            tag: source_column
-            value: OMSCHR
+          source_column: OMSCHR
         range: string
   Admissions:
     name: Admissions
     annotations:
-      source_table:
-        tag: source_table
-        value: opname_opname
+      source_table: opname_opname
     description: 'Staging model for HiX source table: opname_opname'
     attributes:
       admission_id:
         name: admission_id
         annotations:
-          source_column:
-            tag: source_column
-            value: PLANNR
+          source_column: PLANNR
         identifier: true
         range: integer
       referrer_id:
         name: referrer_id
         annotations:
-          source_column:
-            tag: source_column
-            value: VERWIJZER
+          source_column: VERWIJZER
         range: integer
       physician_id:
         name: physician_id
         annotations:
-          source_column:
-            tag: source_column
-            value: BEHANDELAA
+          source_column: BEHANDELAA
         range: integer
       patient_number:
         name: patient_number
         annotations:
-          source_column:
-            tag: source_column
-            value: PATIENTNR
+          source_column: PATIENTNR
         range: integer
       admission_type:
         name: admission_type
         annotations:
-          source_column:
-            tag: source_column
-            value: OPNTYPE
+          source_column: OPNTYPE
         range: string
       specialism:
         name: specialism
         annotations:
-          source_column:
-            tag: source_column
-            value: SPECIALISM
+          source_column: SPECIALISM
         range: string
       location_type:
         name: location_type
         annotations:
-          source_column:
-            tag: source_column
-            value: LOCATIE
+          source_column: LOCATIE
         range: string
       admission_origin:
         name: admission_origin
         annotations:
-          source_column:
-            tag: source_column
-            value: HERKOMST
+          source_column: HERKOMST
         range: string
       admission_duration:
         name: admission_duration
         annotations:
-          source_column:
-            tag: source_column
-            value: OPNDUUR
+          source_column: OPNDUUR
         range: string
       admission_start_date:
         name: admission_start_date
         annotations:
-          source_column:
-            tag: source_column
-            value: OPNDAT
+          source_column: OPNDAT
         range: date
       admission_end_date:
         name: admission_end_date
         annotations:
-          source_column:
-            tag: source_column
-            value: ONTSLDAT
+          source_column: ONTSLDAT
         range: date
       admission_start_time:
         name: admission_start_time
         annotations:
-          source_column:
-            tag: source_column
-            value: OPNTIJD
+          source_column: OPNTIJD
         range: string
       admission_end_time:
         name: admission_end_time
         annotations:
-          source_column:
-            tag: source_column
-            value: ONTSLTIJD
+          source_column: ONTSLTIJD
         range: string
   ConsultCategories:
     name: ConsultCategories
     annotations:
-      source_table:
-        tag: source_table
-        value: consult_category
+      source_table: consult_category
     description: 'Staging model for HiX source table: consult_category'
     attributes:
       consult_category_id:
         name: consult_category_id
         annotations:
-          source_column:
-            tag: source_column
-            value: CATID
+          source_column: CATID
         identifier: true
         range: integer
       consult_category_description:
         name: consult_category_description
         annotations:
-          source_column:
-            tag: source_column
-            value: NAAM
+          source_column: NAAM
         range: string
   Consults:
     name: Consults
     annotations:
-      source_table:
-        tag: source_table
-        value: consult_regpart
+      source_table: consult_regpart
     description: 'Staging model for HiX source table: consult_regpart'
     attributes:
       consult_id:
         name: consult_id
         annotations:
-          source_column:
-            tag: source_column
-            value: PARTID
+          source_column: PARTID
         identifier: true
         range: integer
       patient_number:
         name: patient_number
         annotations:
-          source_column:
-            tag: source_column
-            value: PATIENTNR
+          source_column: PATIENTNR
         range: integer
       physician_id:
         name: physician_id
         annotations:
-          source_column:
-            tag: source_column
-            value: ARTS
+          source_column: ARTS
         range: integer
       consult_category_id:
         name: consult_category_id
         annotations:
-          source_column:
-            tag: source_column
-            value: CATEGORYID
+          source_column: CATEGORYID
         range: integer
       specialism:
         name: specialism
         annotations:
-          source_column:
-            tag: source_column
-            value: SPECIALISM
+          source_column: SPECIALISM
         range: string
       care_instance:
         name: care_instance
         annotations:
-          source_column:
-            tag: source_column
-            value: CareInstance
+          source_column: CareInstance
         range: string
       consult_text:
         name: consult_text
         annotations:
-          source_column:
-            tag: source_column
-            value: TEXT
+          source_column: TEXT
         range: string
       consult_date:
         name: consult_date
         annotations:
-          source_column:
-            tag: source_column
-            value: DATE
+          source_column: DATE
         range: date
       consult_time:
         name: consult_time
         annotations:
-          source_column:
-            tag: source_column
-            value: TIME
+          source_column: TIME
         range: string
   DiagnoseCode:
     name: DiagnoseCode
     annotations:
-      source_table:
-        tag: source_table
-        value: episode_diag
+      source_table: episode_diag
     description: 'Staging model for HiX source table: episode_diag'
     attributes:
       diagnosis_code:
         name: diagnosis_code
         annotations:
-          source_column:
-            tag: source_column
-            value: code
+          source_column: code
         identifier: true
         range: integer
       diagnosis_description:
         name: diagnosis_description
         annotations:
-          source_column:
-            tag: source_column
-            value: omschrijv
+          source_column: omschrijv
         range: string
       diagnosis_description_extended:
         name: diagnosis_description_extended
         annotations:
-          source_column:
-            tag: source_column
-            value: langeomsch
+          source_column: langeomsch
         range: string
       specialism:
         name: specialism
         annotations:
-          source_column:
-            tag: source_column
-            value: specialism
+          source_column: specialism
         range: string
       diagnosis_code_start_date:
         name: diagnosis_code_start_date
         annotations:
-          source_column:
-            tag: source_column
-            value: datum
+          source_column: datum
         range: date
       diagnosis_code_end_date:
         name: diagnosis_code_end_date
         annotations:
-          source_column:
-            tag: source_column
-            value: einddatum
+          source_column: einddatum
         range: date
   DiagnosesAndTreatments:
     name: DiagnosesAndTreatments
     annotations:
-      source_table:
-        tag: source_table
-        value: episode_dbcper
+      source_table: episode_dbcper
     description: 'Staging model for HiX source table: episode_dbcper'
     attributes:
       diagnosis_treatment_id:
         name: diagnosis_treatment_id
         annotations:
-          source_column:
-            tag: source_column
-            value: dbcnummer
+          source_column: dbcnummer
         identifier: true
         range: integer
       episode_id:
         name: episode_id
         annotations:
-          source_column:
-            tag: source_column
-            value: episode
+          source_column: episode
         range: integer
       executor:
         name: executor
         annotations:
-          source_column:
-            tag: source_column
-            value: uitvoerder
+          source_column: uitvoerder
         range: integer
       treatment_id:
         name: treatment_id
         annotations:
-          source_column:
-            tag: source_column
-            value: verrichtingid
+          source_column: verrichtingid
         range: integer
       specialism:
         name: specialism
         annotations:
-          source_column:
-            tag: source_column
-            value: specialism
+          source_column: specialism
         range: string
       sub_specialism:
         name: sub_specialism
         annotations:
-          source_column:
-            tag: source_column
-            value: subspec
+          source_column: subspec
         range: string
       exit_code:
         name: exit_code
         annotations:
-          source_column:
-            tag: source_column
-            value: afsluit
+          source_column: afsluit
         range: string
       care_type:
         name: care_type
         annotations:
-          source_column:
-            tag: source_column
-            value: zorgtype
+          source_column: zorgtype
         range: string
       care_demand_code:
         name: care_demand_code
         annotations:
-          source_column:
-            tag: source_column
-            value: zorgvraag
+          source_column: zorgvraag
         range: string
       main_diagnosis:
         name: main_diagnosis
         annotations:
-          source_column:
-            tag: source_column
-            value: hoofddiag
+          source_column: hoofddiag
         range: string
       location:
         name: location
         annotations:
-          source_column:
-            tag: source_column
-            value: locatie
+          source_column: locatie
         range: string
       status_code:
         name: status_code
         annotations:
-          source_column:
-            tag: source_column
-            value: status
+          source_column: status
         range: string
       care_product:
         name: care_product
         annotations:
-          source_column:
-            tag: source_column
-            value: zorgprod
+          source_column: zorgprod
         range: string
       icd10_code:
         name: icd10_code
         annotations:
-          source_column:
-            tag: source_column
-            value: icd10
+          source_column: icd10
         range: string
       diagnose_code:
         name: diagnose_code
         annotations:
-          source_column:
-            tag: source_column
-            value: hoofddiag
+          source_column: hoofddiag
         range: integer
       episode_start_date:
         name: episode_start_date
         annotations:
-          source_column:
-            tag: source_column
-            value: begindat
+          source_column: begindat
         range: date
       episode_end_date:
         name: episode_end_date
         annotations:
-          source_column:
-            tag: source_column
-            value: einddat
+          source_column: einddat
         range: date
   Episodes:
     name: Episodes
     annotations:
-      source_table:
-        tag: source_table
-        value: episode_episode
+      source_table: episode_episode
     description: 'Staging model for HiX source table: episode_episode'
     attributes:
       episode_id:
         name: episode_id
         annotations:
-          source_column:
-            tag: source_column
-            value: episode
+          source_column: episode
         identifier: true
         range: integer
       patient_number:
         name: patient_number
         annotations:
-          source_column:
-            tag: source_column
-            value: patientnr
+          source_column: patientnr
         range: integer
       referral_number:
         name: referral_number
         annotations:
-          source_column:
-            tag: source_column
-            value: verwijsnr
+          source_column: verwijsnr
         range: integer
       episode_description:
         name: episode_description
         annotations:
-          source_column:
-            tag: source_column
-            value: omschr
+          source_column: omschr
         range: string
       specialism:
         name: specialism
         annotations:
-          source_column:
-            tag: source_column
-            value: specialism
+          source_column: specialism
         range: string
       episode_location:
         name: episode_location
         annotations:
-          source_column:
-            tag: source_column
-            value: locatie
+          source_column: locatie
         range: string
       care_type:
         name: care_type
         annotations:
-          source_column:
-            tag: source_column
-            value: zorgtype
+          source_column: zorgtype
         range: string
       diagnose_code:
         name: diagnose_code
         annotations:
-          source_column:
-            tag: source_column
-            value: hoofddiag
+          source_column: hoofddiag
         range: integer
       episode_start_date:
         name: episode_start_date
         annotations:
-          source_column:
-            tag: source_column
-            value: begindat
+          source_column: begindat
         range: date
       episode_end_date:
         name: episode_end_date
         annotations:
-          source_column:
-            tag: source_column
-            value: einddat
+          source_column: einddat
         range: date
       episode_dbc_end_date:
         name: episode_dbc_end_date
         annotations:
-          source_column:
-            tag: source_column
-            value: einddatdbc
+          source_column: einddatdbc
         range: date
   LabRequests:
     name: LabRequests
     annotations:
-      source_table:
-        tag: source_table
-        value: lab_l_aanvrg
+      source_table: lab_l_aanvrg
     description: 'Staging model for HiX source table: lab_l_aanvrg'
     attributes:
       lab_request_id:
         name: lab_request_id
         annotations:
-          source_column:
-            tag: source_column
-            value: AANVRAAGNR
+          source_column: AANVRAAGNR
         identifier: true
         range: integer
       referrer_id:
         name: referrer_id
         annotations:
-          source_column:
-            tag: source_column
-            value: AANVRAGER
+          source_column: AANVRAGER
         range: integer
       physician_id:
         name: physician_id
         annotations:
-          source_column:
-            tag: source_column
-            value: __null__
+          source_column: __null__
         range: integer
       patient_number:
         name: patient_number
         annotations:
-          source_column:
-            tag: source_column
-            value: PATIENTNR
+          source_column: PATIENTNR
         range: integer
       lab_request_start_date:
         name: lab_request_start_date
         annotations:
-          source_column:
-            tag: source_column
-            value: AFDATUM
+          source_column: AFDATUM
         range: date
       lab_request_end_date:
         name: lab_request_end_date
         annotations:
-          source_column:
-            tag: source_column
-            value: ZENDDATUM
+          source_column: ZENDDATUM
         range: date
       lab_request_start_time:
         name: lab_request_start_time
         annotations:
-          source_column:
-            tag: source_column
-            value: AFTIJD
+          source_column: AFTIJD
         range: string
       lab_request_end_time:
         name: lab_request_end_time
         annotations:
-          source_column:
-            tag: source_column
-            value: SENDTIME
+          source_column: SENDTIME
         range: string
   Medication:
     name: Medication
     annotations:
-      source_table:
-        tag: source_table
-        value: medicat_recdeel
+      source_table: medicat_recdeel
     description: 'Staging model for HiX source table: medicat_recdeel'
     attributes:
       prescription_id:
         name: prescription_id
         annotations:
-          source_column:
-            tag: source_column
-            value: IDENTIF
+          source_column: IDENTIF
         identifier: true
         range: integer
       patient_number:
         name: patient_number
         annotations:
-          source_column:
-            tag: source_column
-            value: PATIENTNR
+          source_column: PATIENTNR
         range: integer
       medicine_id:
         name: medicine_id
         annotations:
-          source_column:
-            tag: source_column
-            value: MEDCD
+          source_column: MEDCD
         range: integer
       duration_code:
         name: duration_code
         annotations:
-          source_column:
-            tag: source_column
-            value: IssueRequestDurationUnit
+          source_column: IssueRequestDurationUnit
         range: string
       explanation:
         name: explanation
         annotations:
-          source_column:
-            tag: source_column
-            value: EXDISPL
+          source_column: EXDISPL
         range: string
       delivery_unit_code:
         name: delivery_unit_code
         annotations:
-          source_column:
-            tag: source_column
-            value: DeliveryUnitCode
+          source_column: DeliveryUnitCode
         range: string
       administration_code:
         name: administration_code
         annotations:
-          source_column:
-            tag: source_column
-            value: TOEDCD
+          source_column: TOEDCD
         range: string
       prescription_type:
         name: prescription_type
         annotations:
-          source_column:
-            tag: source_column
-            value: VRSCHRTYP
+          source_column: VRSCHRTYP
         range: string
       stop_reason:
         name: stop_reason
         annotations:
-          source_column:
-            tag: source_column
-            value: STPREDEN
+          source_column: STPREDEN
         range: string
       registration_type:
         name: registration_type
         annotations:
-          source_column:
-            tag: source_column
-            value: REGTYPE
+          source_column: REGTYPE
         range: string
       pharmacy_code:
         name: pharmacy_code
         annotations:
-          source_column:
-            tag: source_column
-            value: APOTHCODE
+          source_column: APOTHCODE
         range: string
       administration_method:
         name: administration_method
         annotations:
-          source_column:
-            tag: source_column
-            value: TOEDOMS
+          source_column: TOEDOMS
         range: string
       medication_group:
         name: medication_group
         annotations:
-          source_column:
-            tag: source_column
-            value: GROEPOMS
+          source_column: GROEPOMS
         range: string
       schema_code:
         name: schema_code
         annotations:
-          source_column:
-            tag: source_column
-            value: SCHEMCD
+          source_column: SCHEMCD
         range: string
       duration:
         name: duration
         annotations:
-          source_column:
-            tag: source_column
-            value: IssueRequestDurationAmount
+          source_column: IssueRequestDurationAmount
         range: integer
       repetitions:
         name: repetitions
         annotations:
-          source_column:
-            tag: source_column
-            value: Repetitions
+          source_column: Repetitions
         range: integer
       delivery_amount:
         name: delivery_amount
         annotations:
-          source_column:
-            tag: source_column
-            value: DeliveryAmount
+          source_column: DeliveryAmount
         range: integer
       prescription_start_date:
         name: prescription_start_date
         annotations:
-          source_column:
-            tag: source_column
-            value: VRSCHRDAT
+          source_column: VRSCHRDAT
         range: date
       prescription_end_date:
         name: prescription_end_date
         annotations:
-          source_column:
-            tag: source_column
-            value: InitialStopDate
+          source_column: InitialStopDate
         range: date
       prescription_start_time:
         name: prescription_start_time
         annotations:
-          source_column:
-            tag: source_column
-            value: ACCTD
+          source_column: ACCTD
         range: string
   Medicines:
     name: Medicines
     annotations:
-      source_table:
-        tag: source_table
-        value: medicat_medicijn
+      source_table: medicat_medicijn
     description: 'Staging model for HiX source table: medicat_medicijn'
     attributes:
       medicine_id:
         name: medicine_id
         annotations:
-          source_column:
-            tag: source_column
-            value: CODE
+          source_column: CODE
         identifier: true
         range: integer
       medicine_description:
         name: medicine_description
         annotations:
-          source_column:
-            tag: source_column
-            value: OMSCHR
+          source_column: OMSCHR
         range: string
       atc_code:
         name: atc_code
         annotations:
-          source_column:
-            tag: source_column
-            value: ATCCODE
+          source_column: ATCCODE
         range: string
       z_index:
         name: z_index
         annotations:
-          source_column:
-            tag: source_column
-            value: ZNDXART
+          source_column: ZNDXART
         range: string
       z_index_hpk:
         name: z_index_hpk
         annotations:
-          source_column:
-            tag: source_column
-            value: ZNDXHPK
+          source_column: ZNDXHPK
         range: string
       z_index_prk:
         name: z_index_prk
         annotations:
-          source_column:
-            tag: source_column
-            value: ZNDXPRK
+          source_column: ZNDXPRK
         range: string
       z_index_gpk:
         name: z_index_gpk
         annotations:
-          source_column:
-            tag: source_column
-            value: ZNDXGPK
+          source_column: ZNDXGPK
         range: string
   Patients:
     name: Patients
     annotations:
-      source_table:
-        tag: source_table
-        value: patient_patient
+      source_table: patient_patient
     description: 'Staging model for HiX source table: patient_patient'
     attributes:
       patient_number:
         name: patient_number
         annotations:
-          source_column:
-            tag: source_column
-            value: PATIENTNR
+          source_column: PATIENTNR
         identifier: true
         range: integer
       gender:
         name: gender
         annotations:
-          source_column:
-            tag: source_column
-            value: GESLACHT
+          source_column: GESLACHT
         range: string
       street:
         name: street
         annotations:
-          source_column:
-            tag: source_column
-            value: ADRES
+          source_column: ADRES
         range: string
       house_number:
         name: house_number
         annotations:
-          source_column:
-            tag: source_column
-            value: HUISNR
+          source_column: HUISNR
         range: string
       zip_code:
         name: zip_code
         annotations:
-          source_column:
-            tag: source_column
-            value: POSTCODE
+          source_column: POSTCODE
         range: string
       city:
         name: city
         annotations:
-          source_column:
-            tag: source_column
-            value: WOONPLAATS
+          source_column: WOONPLAATS
         range: string
       country:
         name: country
         annotations:
-          source_column:
-            tag: source_column
-            value: LAND
+          source_column: LAND
         range: string
       general_practitioner:
         name: general_practitioner
         annotations:
-          source_column:
-            tag: source_column
-            value: HUISARTS
+          source_column: HUISARTS
         range: string
       birth_date:
         name: birth_date
         annotations:
-          source_column:
-            tag: source_column
-            value: GEBDAT
+          source_column: GEBDAT
         range: date
       birth_time:
         name: birth_time
         annotations:
-          source_column:
-            tag: source_column
-            value: GEBOORTETIJD
+          source_column: GEBOORTETIJD
         range: string
   Units:
     name: Units
     annotations:
-      source_table:
-        tag: source_table
-        value: medicat_eenheid
+      source_table: medicat_eenheid
     description: 'Staging model for HiX source table: medicat_eenheid'
     attributes:
       unit_id:
         name: unit_id
         annotations:
-          source_column:
-            tag: source_column
-            value: CODE
+          source_column: CODE
         identifier: true
         range: integer
       unit_description:
         name: unit_description
         annotations:
-          source_column:
-            tag: source_column
-            value: OMSCHR
+          source_column: OMSCHR
         range: string

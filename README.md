@@ -45,17 +45,29 @@ Classes in a LinkML schema can carry a `domain` annotation. When present, the no
 
 ### Annotating a class
 
+Use the **compact annotation form** (a plain scalar value):
+
 ```yaml
 classes:
   Person:
     annotations:
-      domain:
-        tag: domain
-        value: clinical
+      domain: clinical
     attributes:
       person_id:
         identifier: true
 ```
+
+The LinkML metamodel also allows an expanded `{tag, value}` form, but the compact form is preferred and is what the included schemas (`sein.yaml`, `hix.yaml`) use:
+
+```yaml
+# expanded form — verbose, avoid
+annotations:
+  domain:
+    tag: domain
+    value: clinical
+```
+
+The parser accepts both forms.
 
 ### Configuring domain colors
 

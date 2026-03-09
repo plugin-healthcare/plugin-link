@@ -48,7 +48,7 @@ export interface RawLinkMLSlot {
   is_a?: string;
   slot_uri?: string;
   exact_mappings?: string[];
-  annotations?: Record<string, { tag: string; value: unknown }>;
+  annotations?: Record<string, { tag: string; value: unknown } | string | number | boolean | null>;
 }
 
 export interface RawLinkMLClass {
@@ -61,8 +61,8 @@ export interface RawLinkMLClass {
   attributes?: Record<string, RawLinkMLSlot>;
   is_a?: string;
   abstract?: boolean;
-  // annotations: arbitrary key → {tag, value} pairs (e.g. domain, source_table)
-  annotations?: Record<string, { tag: string; value: unknown }>;
+  // annotations: arbitrary key → {tag, value} pairs or compact scalar (e.g. domain: clinical)
+  annotations?: Record<string, { tag: string; value: unknown } | string | number | boolean | null>;
 }
 
 export interface RawLinkMLSchema {
