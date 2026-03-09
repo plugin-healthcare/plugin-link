@@ -5,9 +5,16 @@ default:
     npm run dev
 
 # Start Tauri desktop dev (wraps Vite dev server in a native window)
-tauri-dev:
+dev-tauri:
     npm run tauri:dev
 
-# Build Tauri desktop app bundle (.app / .exe / .deb)
-tauri-build:
+# Build Tauri desktop app bundle (.app / .exe / .deb) for the current platform
+build-tauri:
     npm run tauri:build
+
+# Build macOS Apple Silicon installer (.app + .dmg)
+# Prerequisites: brew install create-dmg
+# Output: src-tauri/target/aarch64-apple-darwin/release/bundle/
+build-macos-silicon:
+    rustup target add aarch64-apple-darwin
+    npm run tauri:build -- --target aarch64-apple-darwin
