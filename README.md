@@ -6,7 +6,9 @@ Upload any LinkML schema YAML file and explore it as an interactive entity-relat
 
 Defaults to the fully merged [OMOP CDM](https://ohdsi.github.io/CommonDataModel/) v5.4 schema. Also includes the **SEIN** schema — a merged HiX staging + OMOP CDM subset with slot-level ETL mappings.
 
-## Usage
+The app ships as both a **web SPA** (hosted on GitHub Pages) and a **native desktop app** built with [Tauri v2](https://tauri.app).
+
+## Web usage
 
 ```sh
 npm install
@@ -20,6 +22,45 @@ To build for production:
 ```sh
 npm run build
 npm run preview
+```
+
+## Desktop (Tauri v2)
+
+The same SvelteKit frontend is wrapped in a native window via Tauri v2. Supports macOS, Windows, and Linux.
+
+### Development
+
+```sh
+just dev-tauri     # or: npm run tauri:dev
+```
+
+Starts the Vite dev server and opens the app in a native window.
+
+### Building
+
+```sh
+just build-tauri              # build for the current platform
+just build-macos-silicon      # macOS Apple Silicon .app + .dmg
+                              # prerequisite: brew install create-dmg
+```
+
+Output artifacts are placed in `src-tauri/target/<target-triple>/release/bundle/`.
+
+> The `beforeBuildCommand` in `src-tauri/tauri.conf.json` runs `npm run build` automatically, so the SvelteKit build is always in sync with the Tauri bundle.
+
+### Tauri shell
+
+`src-tauri/` contains the minimal Rust harness — no custom Rust logic beyond the standard Tauri app setup:
+
+```
+src-tauri/
+├── tauri.conf.json   # app metadata, window size (1400×900), bundle targets
+├── Cargo.toml        # tauri v2 + tauri-plugin-opener
+├── src/
+│   ├── main.rs       # binary entry point
+│   └── lib.rs        # tauri::Builder::default().run(...)
+├── icons/            # platform icons (.png, .icns, .ico)
+└── capabilities/     # Tauri v2 capability definitions
 ```
 
 ## Features
@@ -136,6 +177,7 @@ Two slide-in panels are accessible from the top bar:
 ## Project structure
 
 ```
+src-tauri/                    # Tauri v2 desktop shell
 src/
   lib/
     types.ts              # ErdSlot, ErdClass, NormalizedSchema, ErdNodeData, DomainInfo

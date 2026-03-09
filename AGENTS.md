@@ -10,15 +10,31 @@ An interactive **Entity Relationship Diagram (ERD) viewer** built with SvelteKit
 
 There is no backend. Everything runs in the browser as a static SPA.
 
+The project ships two deployment targets from the same SvelteKit frontend:
+
+- **Web / GitHub Pages** — static SPA built with `@sveltejs/adapter-static`, deployed via `.github/workflows/deploy.yml`.
+- **Desktop (Tauri v2)** — the same static build is wrapped in a native window using [Tauri v2](https://tauri.app). The Tauri shell lives in `src-tauri/` and adds no extra Rust logic beyond the standard app harness. Supports macOS (`.app` / `.dmg`), Windows (`.exe` / `.msi`), and Linux (`.deb` / `.AppImage`).
+
 ---
 
 ## Running the project
 
 ```bash
-just          # start dev server (npm run dev) at http://localhost:5173
-npm run build # production build → build/
-npm run check # svelte-check type checking
+just                    # start web dev server (npm run dev) at http://localhost:5173
+just dev-tauri          # start Tauri desktop dev (wraps Vite dev in a native window)
+npm run build           # production web build → build/
+npm run check           # svelte-check type checking
 ```
+
+### Desktop builds
+
+```bash
+just build-tauri                # build for the current platform
+just build-macos-silicon        # macOS Apple Silicon .app + .dmg (requires: brew install create-dmg)
+# Output: src-tauri/target/<target-triple>/release/bundle/
+```
+
+Tauri v2 CLI is invoked via `npm run tauri:dev` / `npm run tauri:build` (see `package.json`). The `beforeBuildCommand` in `tauri.conf.json` runs `npm run build` automatically before bundling.
 
 ---
 
@@ -34,6 +50,7 @@ npm run check # svelte-check type checking
 | Language | TypeScript 5, strict mode |
 | Build tool | Vite 7 |
 | Adapter | `@sveltejs/adapter-static` (static SPA, GitHub Pages) |
+| Desktop shell | Tauri v2 (`src-tauri/`) — wraps the static build in a native window |
 
 ---
 
@@ -42,9 +59,17 @@ npm run check # svelte-check type checking
 ```
 plugin-link/
 ├── .github/workflows/deploy.yml  # deploy to GitHub Pages on push to main
-├── justfile                      # default recipe: npm run dev
+├── justfile                      # default recipe: npm run dev; also Tauri build recipes
 ├── svelte.config.js              # adapter-static, base: /plugin-link in prod
-├── vite.config.ts                # sveltekit() plugin + elkjs web-worker externals
+├── vite.config.ts                # sveltekit() plugin + chunk size warning limit
+├── src-tauri/                    # Tauri v2 desktop shell
+│   ├── tauri.conf.json           # app metadata, window config, bundle targets
+│   ├── Cargo.toml                # Rust crate (tauri + tauri-plugin-opener)
+│   ├── src/
+│   │   ├── main.rs               # binary entry point
+│   │   └── lib.rs                # tauri::Builder::default().run(...)
+│   ├── icons/                    # platform icons (.png, .icns, .ico)
+│   └── capabilities/             # Tauri v2 capability definitions
 ├── static/
 │   ├── omop_cdm.yaml             # default schema (OMOP CDM v5.4, fully merged, 13 879 lines)
 │   ├── sein.yaml                 # SEIN merged schema (13 HiX staging + 17 OMOP classes, 30 total)
@@ -395,10 +420,7 @@ Uses Svelte 5 runes throughout:
 
 - **`svelte.config.js`**: uses `adapter-static` with `fallback: '404.html'` for client-side routing on GitHub Pages. The `base` path is `/plugin-link` in production (`NODE_ENV=production`) and empty in development.
 - **`src/routes/+layout.ts`**: sets `prerender = true` and `ssr = false`, making the entire app a client-side SPA with statically prerendered HTML shells.
-- **`vite.config.ts`**: `sveltekit()` plugin plus two `elkjs`/`web-worker` workarounds:
-  - `optimizeDeps.esbuildOptions` — esbuild plugin that marks `web-worker` as external, suppressing the `Could not resolve "web-worker"` error during `npm run dev` pre-bundling.
-  - `build.rollupOptions.external: ['web-worker']` — suppresses the same warning during the production Rollup build.
-  - `build.chunkSizeWarningLimit: 1600` — silences the bundle-size warning from the ~1.4 MB elkjs chunk.
+- **`vite.config.ts`**: `sveltekit()` plugin plus `build.chunkSizeWarningLimit: 1600` to silence the bundle-size warning from the ~1.4 MB `elk.bundled.js` chunk.
 
 ---
 
@@ -406,7 +428,7 @@ Uses Svelte 5 runes throughout:
 
 - **`useSvelteFlow()` must be called inside a child of `<SvelteFlow>`** — calling it at page-level script scope crashes the app to a blank page. It lives in `FlowController.svelte`.
 - **`setContext` must be called synchronously at component init** — calling it inside `onMount` or inside a `.then()` callback means child components have already called `getContext` and received `undefined`. Always declare the `$state` holder and call `setContext` at the top level of the `<script>` block.
-- **elkjs `web-worker`**: elkjs conditionally `require('web-worker')` in Node environments; in the browser it falls back gracefully but causes build-time errors without the two `vite.config.ts` workarounds above.
+- **elkjs browser build**: import `elkjs/lib/elk.bundled.js` directly rather than the bare `elkjs` package entry. The default entry conditionally `require('web-worker')` in Node environments; in the browser this bare specifier is never resolved, producing a runtime "Failed to resolve module specifier \"web-worker\"" error. The bundled entry has no such dependency and requires no `vite.config.ts` workarounds.
 - **`labelBgStyle`** is not a valid property on the `@xyflow/svelte` `Edge` type — do not use it.
 - **LSP stale errors**: LSP may show stale type errors in `.svelte` files (e.g. `LayoutOptions` not found, `buildGraph` wrong arg count, `DomainInfo` not exported). These are false positives — `npm run build` is the ground truth.
 

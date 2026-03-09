@@ -187,7 +187,7 @@ async function buildGraphElk(
   collapsed: Set<string>,
   direction: 'LR' | 'TB'
 ): Promise<{ nodes: Node[]; edges: Edge[] }> {
-  const ELK = (await import('elkjs')).default;
+  const ELK = (await import('elkjs/lib/elk.bundled.js')).default;
   const elk = new ELK();
 
   const fkEdges: AnyEdge[] = collectEdges(schema).map(e => ({ ...e, kind: 'fk' as const }));
