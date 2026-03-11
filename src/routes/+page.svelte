@@ -18,7 +18,7 @@
   import GroupEditor from '$lib/components/GroupEditor.svelte';
   import FileList from '$lib/components/FileList.svelte';
 
-  import { loadGroupConfig, parseWorkspaceFile } from '$lib/linkml';
+  import { loadGroupConfig, parseWorkspaceFile, assignFileIds } from '$lib/linkml';
   import { buildGraph } from '$lib/layout';
   import type {
     NormalizedSchema,
@@ -26,8 +26,27 @@
     GroupInfo,
     WorkspaceFile,
     ErdClass,
+    FileInfo,
   } from '$lib/types';
   import { base } from '$app/paths';
+
+  // ---------------------------------------------------------------------------
+  // File color palette — 12 visually distinct, accessible colors for per-file stripes
+  // ---------------------------------------------------------------------------
+  const FILE_PALETTE = [
+    '#0ea5e9', // sky-500
+    '#f97316', // orange-500
+    '#22c55e', // green-500
+    '#a855f7', // purple-500
+    '#ef4444', // red-500
+    '#14b8a6', // teal-500
+    '#f59e0b', // amber-500
+    '#ec4899', // pink-500
+    '#6366f1', // indigo-500
+    '#84cc16', // lime-500
+    '#06b6d4', // cyan-500
+    '#f43f5e', // rose-500
+  ];
 
   // ---------------------------------------------------------------------------
   // Group config — set context synchronously with a reactive holder so
@@ -36,6 +55,13 @@
   // ---------------------------------------------------------------------------
   const groupCtx = $state<{ map: Map<string, GroupInfo> | null }>({ map: null });
   setContext('groupConfig', groupCtx);
+
+  // ---------------------------------------------------------------------------
+  // File config — per-file stripe colors, reactive holder set as context.
+  // Map is keyed by WorkspaceFile.id → hex color string.
+  // ---------------------------------------------------------------------------
+  const fileCtx = $state<{ map: Map<string, string> }>({ map: new Map() });
+  setContext('fileConfig', fileCtx);
 
   // ---------------------------------------------------------------------------
   // Node types registration
@@ -80,13 +106,19 @@
           continue;
         }
         const sub = resolveImports(imported, allFiles, visited, depth + 1);
-        Object.assign(mergedClasses, sub.merged.classes);
+        // Stamp each imported class with the source file's id before merging
+        const stamped = assignFileIds(sub.merged, imported.id);
+        Object.assign(mergedClasses, stamped.classes);
         unresolved.push(...sub.unresolved);
       }
     }
 
-    // Active file's own classes override imports
-    Object.assign(mergedClasses, file.schema.classes);
+    // Active file's own classes override imports — stamp with active file id
+    const ownStamped = assignFileIds(
+      { name: file.schema.name, description: file.schema.description, id: file.schema.id, classes: file.schema.classes },
+      file.id
+    );
+    Object.assign(mergedClasses, ownStamped.classes);
 
     return {
       merged: {
@@ -195,6 +227,8 @@
       workspaceFiles = [wf];
       activeFileId = wf.id;
       collapsed = new Set();
+      // Assign first palette color to the default file
+      fileCtx.map = new Map([[wf.id, FILE_PALETTE[0]]]);
     } catch (e) {
       loadError = `Failed to load default schema: ${(e as Error).message}`;
     }
@@ -204,13 +238,29 @@
    * Add newly uploaded files to the workspace.
    * Deduplicates by stem (case-insensitive); existing files with the same stem
    * are replaced so that re-uploading a revised file works naturally.
+   * Assigns a palette color to each genuinely new file (not a replacement).
    */
   function handleUploadedFiles(incoming: WorkspaceFile[]) {
     const map = new Map(workspaceFiles.map((f) => [f.stem.toLowerCase(), f]));
     for (const f of incoming) {
-      map.set(f.stem.toLowerCase(), f);
+      const key = f.stem.toLowerCase();
+      const isReplacement = map.has(key);
+      if (isReplacement) {
+        // Keep the existing color for the replaced file
+        const existingId = map.get(key)!.id;
+        const existingColor = fileCtx.map.get(existingId);
+        map.set(key, f);
+        if (existingColor) fileCtx.map.set(f.id, existingColor);
+      } else {
+        // New file — assign next palette color
+        const colorIndex = fileCtx.map.size % FILE_PALETTE.length;
+        fileCtx.map.set(f.id, FILE_PALETTE[colorIndex]);
+        map.set(key, f);
+      }
     }
     workspaceFiles = Array.from(map.values());
+    // Trigger reactivity on fileCtx.map
+    fileCtx.map = new Map(fileCtx.map);
     // Activate the first incoming file (or keep current if it's still present)
     const currentStillPresent = workspaceFiles.some((f) => f.id === activeFileId);
     if (!currentStillPresent || !activeFileId) {
@@ -229,6 +279,8 @@
   /** Remove a file from the workspace. */
   function handleFileRemove(id: string) {
     workspaceFiles = workspaceFiles.filter((f) => f.id !== id);
+    fileCtx.map.delete(id);
+    fileCtx.map = new Map(fileCtx.map);
     if (activeFileId === id) {
       activeFileId = workspaceFiles[0]?.id ?? null;
       collapsed = new Set();
@@ -303,6 +355,29 @@
   // Only show the legend when at least one node has a group annotation.
   const hasGroups = $derived(activeGroupNames.length > 0);
 
+  // Build FileInfo list for the "Files" section in GroupLegend.
+  // Only include files whose classes actually appear in the current nodes.
+  const activeFileIds = $derived(
+    [...new Set(
+      nodes
+        .map((n) => (n.data as unknown as { fileId?: string }).fileId)
+        .filter((id): id is string => typeof id === 'string')
+    )]
+  );
+  const fileInfoList = $derived<FileInfo[]>(
+    activeFileIds
+      .map((id) => {
+        const wf = workspaceFiles.find((f) => f.id === id);
+        if (!wf) return null;
+        const color = fileCtx.map.get(id) ?? '#94a3b8';
+        const label = wf.schema.name && wf.schema.name !== 'Unknown schema'
+          ? wf.schema.name
+          : wf.stem;
+        return { id, label, color } satisfies FileInfo;
+      })
+      .filter((f): f is FileInfo => f !== null)
+  );
+
   // Edge count label: distinguish FK vs ETL
   const fkEdgeCount = $derived(
     edges.filter((e) => (e.data as unknown as { edgeKind?: string })?.edgeKind !== 'etl').length
@@ -326,8 +401,8 @@
       />
     {/if}
 
-    {#if schema && hasGroups}
-      <GroupLegend {activeGroupNames} />
+    {#if schema && (hasGroups || fileInfoList.length > 1)}
+      <GroupLegend {activeGroupNames} {fileInfoList} />
     {/if}
   </div>
 

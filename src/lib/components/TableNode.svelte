@@ -12,9 +12,11 @@
   const rawData = $derived(data as unknown as ErdNodeData);
 
   // Group config injected by +page.svelte via setContext.
-  // The context holds a reactive $state wrapper { map } so that updates
-  // after the async fetch are visible here without re-running getContext.
   const groupCtx = getContext<{ map: Map<string, GroupInfo> | null }>('groupConfig');
+
+  // File config injected by +page.svelte via setContext.
+  // Map is WorkspaceFile.id → hex color string.
+  const fileCtx = getContext<{ map: Map<string, string> }>('fileConfig');
 
   // Default fallback when no group config or unknown group
   const DEFAULT_COLOR = '#475569';
@@ -32,6 +34,15 @@
     const map = groupCtx?.map;
     if (!group || !map) return DEFAULT_TEXT;
     return map.get(group)?.text_color ?? map.get('default')?.text_color ?? DEFAULT_TEXT;
+  })());
+
+  // Left stripe color from file config — only shown when a fileId is present
+  // and more than one file exists in the color map (i.e., multi-file workspace).
+  const stripeColor = $derived((() => {
+    const fileId = rawData.fileId;
+    const map = fileCtx?.map;
+    if (!fileId || !map || map.size <= 1) return null;
+    return map.get(fileId) ?? null;
   })());
 
   // ---------------------------------------------------------------------------
@@ -88,10 +99,14 @@
     class="header"
     style:background={headerColor}
     style:color={headerText}
+    style:padding-left={stripeColor ? '16px' : '10px'}
     onclick={() => (collapsed = !collapsed)}
     title={rawData.description || rawData.label}
     aria-expanded={!collapsed}
   >
+    {#if stripeColor}
+      <span class="file-stripe" style:background={stripeColor}></span>
+    {/if}
     <span class="table-name">{rawData.label}</span>
     <span class="collapse-icon">{collapsed ? '▶' : '▼'}</span>
   </button>
@@ -157,6 +172,18 @@
     border: none;
     text-align: left;
     gap: 6px;
+    position: relative;
+  }
+
+  /* File source stripe — 6px left edge, absolutely positioned */
+  .file-stripe {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    border-radius: 4px 0 0 4px;
+    pointer-events: none;
   }
 
   .table-name {

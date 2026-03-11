@@ -1,10 +1,12 @@
 <script lang="ts">
   import { getContext } from 'svelte';
-  import type { GroupInfo } from '$lib/types';
+  import type { GroupInfo, FileInfo } from '$lib/types';
 
   // Receive list of group names actually present in the current schema's nodes.
-  // Parent derives this from the rendered nodes so we only show relevant groups.
-  let { activeGroupNames }: { activeGroupNames: string[] } = $props();
+  let { activeGroupNames, fileInfoList = [] }: {
+    activeGroupNames: string[];
+    fileInfoList?: FileInfo[];
+  } = $props();
 
   // Group config injected by +page.svelte (same reactive wrapper as TableNode uses).
   const groupCtx = getContext<{ map: Map<string, GroupInfo> | null }>('groupConfig');
@@ -19,6 +21,9 @@
       (d) => d.name !== 'default' && active.has(d.name)
     );
   })());
+
+  // Only show the Files section when multiple files contributed classes.
+  const showFiles = $derived(fileInfoList.length > 1);
 </script>
 
 <aside class="sidebar">
@@ -30,6 +35,20 @@
         <div class="group-row">
           <span class="swatch" style:background={d.color}></span>
           <span class="group-label">{d.label}</span>
+        </div>
+      {/each}
+    </section>
+    <div class="divider"></div>
+  {/if}
+
+  <!-- File source colors — only shown in multi-file workspaces -->
+  {#if showFiles}
+    <section class="section">
+      <div class="section-title">Files</div>
+      {#each fileInfoList as f}
+        <div class="group-row">
+          <span class="stripe-swatch" style:background={f.color}></span>
+          <span class="group-label" title={f.label}>{f.label}</span>
         </div>
       {/each}
     </section>
@@ -106,6 +125,7 @@
     display: flex;
     align-items: center;
     gap: 7px;
+    min-width: 0;
   }
 
   .swatch {
@@ -115,9 +135,21 @@
     flex-shrink: 0;
   }
 
+  /* File stripe swatch — narrow rectangle to mirror the header stripe */
+  .stripe-swatch {
+    width: 6px;
+    height: 14px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
   .group-label {
     font-size: 11px;
     color: #374151;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
   }
 
   /* Legend rows */

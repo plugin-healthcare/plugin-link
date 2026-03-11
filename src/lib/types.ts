@@ -21,7 +21,8 @@ export interface ErdClass {
   name: string;
   description: string;
   slots: ErdSlot[];
-  group?: string; // e.g. "clinical", "vocabulary", "hix" — from annotations.group
+  group?: string;   // e.g. "clinical", "vocabulary", "hix" — from annotations.group
+  fileId?: string;  // WorkspaceFile.id of the file this class was parsed from
 }
 
 /** The top-level normalized schema structure */
@@ -129,6 +130,17 @@ export interface GroupConfig {
 }
 
 // ---------------------------------------------------------------------------
+// File configuration — auto-assigned per-file colors for multi-file workspaces
+// ---------------------------------------------------------------------------
+
+/** Per-file color entry, keyed by WorkspaceFile.id */
+export interface FileInfo {
+  id: string;     // WorkspaceFile.id
+  label: string;  // display name: schema.name or filename stem
+  color: string;  // hex stripe color, auto-assigned from FILE_PALETTE
+}
+
+// ---------------------------------------------------------------------------
 // ERD graph model — output of the parser, input to Svelte Flow
 // ---------------------------------------------------------------------------
 
@@ -138,7 +150,8 @@ export interface ErdNodeData {
   slots: ErdSlot[];
   collapsed: boolean;
   highlighted?: boolean;
-  group?: string; // propagated from ErdClass.group
+  group?: string;   // propagated from ErdClass.group
+  fileId?: string;  // propagated from ErdClass.fileId — drives the left stripe color
 }
 
 export interface ErdEdgeData {

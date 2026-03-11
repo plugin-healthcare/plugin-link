@@ -21,6 +21,7 @@ import type {
   GroupConfig,
   GroupInfo,
   WorkspaceFile,
+  FileInfo,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -315,3 +316,19 @@ export function parseWorkspaceFile(name: string, text: string): WorkspaceFile {
     imports,
   };
 }
+
+/**
+ * Stamp every class in a NormalizedSchema with the given fileId.
+ * Returns a new schema object (does not mutate the input).
+ * Called during import resolution so each merged class knows its source file.
+ */
+export function assignFileIds(schema: NormalizedSchema, fileId: string): NormalizedSchema {
+  const classes: Record<string, import('./types').ErdClass> = {};
+  for (const [key, cls] of Object.entries(schema.classes)) {
+    classes[key] = { ...cls, fileId };
+  }
+  return { ...schema, classes };
+}
+
+// Re-export FileInfo so callers can import it from '$lib/linkml' if needed
+export type { FileInfo };

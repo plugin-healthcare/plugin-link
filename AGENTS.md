@@ -22,8 +22,8 @@ The project ships two deployment targets from the same SvelteKit frontend:
 ```bash
 just                    # start web dev server (npm run dev) at http://localhost:5173
 just dev-tauri          # start Tauri desktop dev (wraps Vite dev in a native window)
-npm run build           # production web build → build/
-npm run check           # svelte-check type checking
+pnpm run build           # production web build → build/
+pnpm run check           # svelte-check type checking
 ```
 
 ### Desktop builds
@@ -83,8 +83,8 @@ plugin-link/
     │   ├── +layout.svelte        # Svelte Flow CSS import, favicon, global box-sizing/overflow
     │   └── +page.svelte          # main app: state, canvas wiring, top bar, layout toolbar
     └── lib/
-        ├── types.ts              # all shared TypeScript interfaces
-        ├── linkml.ts             # schema parser (YAML + JSON), loadDefaultSchema(), loadGroupConfig()
+        ├── types.ts              # all shared TypeScript interfaces (ErdClass, ErdNodeData, FileInfo, GroupInfo, …)
+        ├── linkml.ts             # schema parser (YAML + JSON), loadDefaultSchema(), loadGroupConfig(), assignFileIds()
         ├── layout.ts             # async buildGraph(schema, collapsed, LayoutOptions) — dagre + elk
         └── components/
             ├── CustomControls.svelte  # bottom-left controls: zoom/fit/lock + layout buttons (2×4 grid)
@@ -107,6 +107,8 @@ static/omop_cdm.yaml  ──fetch──▶  parseLinkMLSchema()  ──▶  Norm
 uploaded file         ──upload──▶  parseLinkMLSchema()  ──▶  NormalizedSchema
 YAML editor (live)    ──debounce─▶  parseLinkMLSchema()  ──▶  NormalizedSchema
                                                                │
+                                                        assignFileIds(schema, fileId)
+                                                               │
                                                         buildGraph(schema, collapsed)
                                                                │
                                                         Node[] + Edge[]  ──▶  SvelteFlow
@@ -115,14 +117,20 @@ static/group-config.yaml  ──fetch──▶  loadGroupConfig()  ──▶  Ma
                                                                         │
                                               setContext('groupConfig', groupCtx)  ──▶  TableNode + GroupLegend
 Group editor (live)   ──onchange──▶  groupCtx.map = new Map(...)  ──▶  TableNode + GroupLegend
+
+handleUploadedFiles() ──upload──▶  FILE_PALETTE color assigned per file  ──▶  fileCtx.map
+                                                                                    │
+                                              setContext('fileConfig', fileCtx)  ──▶  TableNode + GroupLegend
 ```
 
 1. On mount, `+page.svelte` fetches `omop_cdm.yaml` raw text, stores it in `schemaYamlText`, and calls `parseLinkMLSchema()`.
-2. The `NormalizedSchema` is stored in `$state`.
-3. A `$effect` calls `buildGraph()` whenever `schema` or `collapsed` changes, writing new `Node[]` / `Edge[]` into `$state.raw`.
-4. Svelte Flow re-renders reactively.
-5. In parallel on mount, `loadGroupConfig()` fetches `group-config.yaml` and populates `groupCtx.map`.
-6. `TableNode` and `GroupLegend` read `groupCtx` from Svelte context reactively.
+2. The result is passed through `assignFileIds()` to stamp each class with its source file ID.
+3. The `NormalizedSchema` is stored in `$state`.
+4. A `$effect` calls `buildGraph()` whenever `schema` or `collapsed` changes, writing new `Node[]` / `Edge[]` into `$state.raw`.
+5. Svelte Flow re-renders reactively.
+6. In parallel on mount, `loadGroupConfig()` fetches `group-config.yaml` and populates `groupCtx.map`.
+7. `TableNode` and `GroupLegend` read `groupCtx` from Svelte context reactively.
+8. `fileCtx.map` is populated synchronously when files are uploaded; `TableNode` derives a stripe color from it.
 
 ---
 
@@ -302,7 +310,7 @@ Internal union types `FkEdge`, `EtlEdge`, `AnyEdge` carry a `kind` discriminant.
 
 Edge IDs are `source--slotName--target` for FK edges, with a counter suffix for duplicates. Isolated nodes (no layout position) are skipped silently.
 
-The `group` field from `ErdClass` is propagated into `ErdNodeData` by both the Dagre and ELK build paths so that `TableNode` and `GroupLegend` can access it without querying the schema separately.
+The `group` field from `ErdClass` is propagated into `ErdNodeData` by both the Dagre and ELK build paths so that `TableNode` and `GroupLegend` can access it without querying the schema separately. The `fileId` field is propagated the same way.
 
 ---
 
@@ -310,6 +318,7 @@ The `group` field from `ErdClass` is propagated into `ErdNodeData` by both the D
 
 - Renders as a 260px-wide card with a **group-colored header** (falls back to slate-600 for unannotated classes).
 - Header color and text color are `$derived` from `groupCtx.map` read via `getContext('groupConfig')`. Updates reactively once the group config fetch resolves.
+- **File stripe**: in multi-file workspaces (`fileCtx.map.size > 1`), a 6px colored left stripe is rendered inside the header button via `position: absolute; left: 0; top: 0; bottom: 0; width: 6px`. The color comes from `fileCtx.map` (keyed by `ErdNodeData.fileId`). When only one file is loaded the stripe is hidden. Header `padding-left` is `16px` when a stripe is shown, `10px` otherwise.
 - Click the header to toggle collapse.
 - Each slot row shows:
   - A badge: `PK` (amber) for identifiers, `FK` (slate) for foreign keys, blank for plain slots
@@ -324,15 +333,17 @@ The `group` field from `ErdClass` is propagated into `ErdNodeData` by both the D
 
 ## Group legend (`src/lib/components/GroupLegend.svelte`)
 
-A left-side sidebar (`170px` wide, `border-right: 1px solid #e5e7eb`) rendered only when the loaded schema has at least one group-annotated class (`hasGroups` derived in `+page.svelte`).
+A left-side sidebar (`170px` wide, `border-right: 1px solid #e5e7eb`) rendered when `hasGroups || fileInfoList.length > 1`.
 
 Props:
 - `activeGroupNames: string[]` — the unique group names found in the current `nodes` array, derived in `+page.svelte`.
+- `fileInfoList?: FileInfo[]` — list of `{ id, label, color }` for loaded files (default `[]`). Passed from `+page.svelte`.
 
-Two sections:
-1. **Groups** — one row per active group (colored `14×14` swatch + label). The `default` entry is excluded from this list.
-2. **Legend** — slot row icon key: PK badge (amber), FK badge (slate), bold name = required, plain name = optional, indigo italic = ETL mapping.
-3. **Edges** — ETL edge row: dashed indigo swatch (`border-top: 2px dashed #6366f1`) + "ETL edge" label.
+Sections:
+1. **Files** — shown only when `fileInfoList.length > 1`. One row per file with a `6×14px` stripe swatch (matching the `TableNode` left stripe) and the file label (`schema.name` or filename stem). `min-width: 0` + `text-overflow: ellipsis` prevents long schema names from overflowing.
+2. **Groups** — one row per active group (colored `14×14` swatch + label). The `default` entry is excluded from this list.
+3. **Legend** — slot row icon key: PK badge (amber), FK badge (slate), bold name = required, plain name = optional, indigo italic = ETL mapping.
+4. **Edges** — ETL edge row: dashed indigo swatch (`border-top: 2px dashed #6366f1`) + "ETL edge" label.
 
 The component reads `groupCtx` from Svelte context (same reactive wrapper set by `+page.svelte`), so it updates reactively once `loadGroupConfig()` resolves.
 
@@ -421,6 +432,7 @@ Uses Svelte 5 runes throughout:
 | `$state` | `layoutOptions` | Active `LayoutOptions` (engine + direction) |
 | `$state` | `fitViewTrigger` | Counter incremented after layout to trigger `fitView` |
 | `$state` | `groupCtx` | `{ map: Map<string, GroupInfo> \| null }` — reactive wrapper set as context |
+| `$state` | `fileCtx` | `{ map: Map<string, string> }` — file ID → hex color map, set as `'fileConfig'` context |
 | `$state` | `schemaEditorOpen` | Boolean — controls Schema editor panel visibility |
 | `$state` | `groupEditorOpen` | Boolean — controls Group editor panel visibility |
 | `$state` | `schemaYamlText` | Raw YAML string for the Schema editor (kept in sync with loaded schema) |
@@ -431,6 +443,8 @@ Uses Svelte 5 runes throughout:
 | `$derived` | `activeGroupNames` | Unique group strings present in current `nodes` |
 | `$derived` | `hasGroups` | `true` when `activeGroupNames.length > 0` — gates `GroupLegend` visibility |
 | `$derived` | `groupList` | `GroupInfo[]` array derived from `groupCtx.map` — passed to `GroupEditor` |
+| `$derived` | `activeFileIds` | Unique `fileId` strings present in current `nodes` |
+| `$derived` | `fileInfoList` | `FileInfo[]` array for `GroupLegend` — maps active file IDs to label + color |
 
 `$state.raw` is used for `nodes` and `edges` per the [Svelte Flow performance recommendation](https://github.com/sveltejs/svelte/issues/11851) — deep reactivity on large node arrays causes noticeable lag.
 
@@ -450,7 +464,9 @@ Uses Svelte 5 runes throughout:
 - **`setContext` must be called synchronously at component init** — calling it inside `onMount` or inside a `.then()` callback means child components have already called `getContext` and received `undefined`. Always declare the `$state` holder and call `setContext` at the top level of the `<script>` block.
 - **elkjs browser build**: import `elkjs/lib/elk.bundled.js` directly rather than the bare `elkjs` package entry. The default entry conditionally `require('web-worker')` in Node environments; in the browser this bare specifier is never resolved, producing a runtime "Failed to resolve module specifier \"web-worker\"" error. The bundled entry has no such dependency and requires no `vite.config.ts` workarounds.
 - **`labelBgStyle`** is not a valid property on the `@xyflow/svelte` `Edge` type — do not use it.
-- **LSP stale errors**: LSP may show stale type errors in `.svelte` files (e.g. `LayoutOptions` not found, `buildGraph` wrong arg count, `GroupInfo` not exported). These are false positives — `npm run build` is the ground truth.
+- **`Map` mutations are not reactive in Svelte 5**: `fileCtx.map.set(...)` alone does not trigger reactivity. After any `.set()` or `.delete()` call, reassign: `fileCtx.map = new Map(fileCtx.map)` to notify Svelte of the change.
+- **`assignFileIds` must be called per imported file before merging**: `resolveImports()` stamps each imported file's classes with their own `fileId` before `Object.assign`-merging them into the active schema. Stamping after the merge would overwrite all classes with the active file's ID.
+- **LSP stale errors**: LSP may show stale type errors in `.svelte` files (e.g. `LayoutOptions` not found, `buildGraph` wrong arg count, `GroupInfo` not exported). These are false positives — `pnpm run build` is the ground truth.
 
 ---
 
