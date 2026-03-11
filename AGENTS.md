@@ -75,7 +75,7 @@ plugin-link/
 │   ├── sein.yaml                 # SEIN merged schema (13 HiX staging + 17 OMOP classes, 30 total)
 │   ├── hix.yaml                  # HiX staging classes only (13 classes, raw LinkML)
 │   ├── sein-omop.yaml            # OMOP CDM subset used by SEIN (17 classes, raw LinkML)
-│   ├── domain-config.yaml        # domain name → color/label config (loaded at runtime)
+│   ├── group-config.yaml         # group name → color/label config (loaded at runtime)
 │   └── logo.png                  # favicon
 └── src/
     ├── routes/
@@ -84,17 +84,18 @@ plugin-link/
     │   └── +page.svelte          # main app: state, canvas wiring, top bar, layout toolbar
     └── lib/
         ├── types.ts              # all shared TypeScript interfaces
-        ├── linkml.ts             # schema parser (YAML + JSON), loadDefaultSchema(), loadDomainConfig()
+        ├── linkml.ts             # schema parser (YAML + JSON), loadDefaultSchema(), loadGroupConfig()
         ├── layout.ts             # async buildGraph(schema, collapsed, LayoutOptions) — dagre + elk
         └── components/
             ├── CustomControls.svelte  # bottom-left controls: zoom/fit/lock + layout buttons (2×4 grid)
-            ├── DomainEditor.svelte    # right panel: domain color-picker form (live updates)
-            ├── DomainLegend.svelte    # left sidebar: domain color swatches + slot icon key
+            ├── FileList.svelte        # left sidebar: workspace file list with import badges + context menu
             ├── FlowController.svelte  # useSvelteFlow() context — pan/highlight/fitView
+            ├── GroupEditor.svelte     # right panel: group color-picker form (live updates)
+            ├── GroupLegend.svelte     # left sidebar: group color swatches + slot icon key
             ├── SchemaEditor.svelte    # right panel: CodeMirror 6 YAML editor (500ms debounce)
             ├── SchemaUploader.svelte  # top-bar button + drag-and-drop file picker
             ├── SearchBar.svelte       # top-bar search with keyboard nav and canvas pan
-            └── TableNode.svelte       # custom node: collapsible table card with domain header color
+            └── TableNode.svelte       # custom node: collapsible table card with group header color
 ```
 
 ---
@@ -110,18 +111,18 @@ YAML editor (live)    ──debounce─▶  parseLinkMLSchema()  ──▶  Norm
                                                                │
                                                         Node[] + Edge[]  ──▶  SvelteFlow
 
-static/domain-config.yaml  ──fetch──▶  loadDomainConfig()  ──▶  Map<string, DomainInfo>
+static/group-config.yaml  ──fetch──▶  loadGroupConfig()  ──▶  Map<string, GroupInfo>
                                                                         │
-                                              setContext('domainConfig', domainCtx)  ──▶  TableNode + DomainLegend
-Domain editor (live)   ──onchange──▶  domainCtx.map = new Map(...)  ──▶  TableNode + DomainLegend
+                                              setContext('groupConfig', groupCtx)  ──▶  TableNode + GroupLegend
+Group editor (live)   ──onchange──▶  groupCtx.map = new Map(...)  ──▶  TableNode + GroupLegend
 ```
 
 1. On mount, `+page.svelte` fetches `omop_cdm.yaml` raw text, stores it in `schemaYamlText`, and calls `parseLinkMLSchema()`.
 2. The `NormalizedSchema` is stored in `$state`.
 3. A `$effect` calls `buildGraph()` whenever `schema` or `collapsed` changes, writing new `Node[]` / `Edge[]` into `$state.raw`.
 4. Svelte Flow re-renders reactively.
-5. In parallel on mount, `loadDomainConfig()` fetches `domain-config.yaml` and populates `domainCtx.map`.
-6. `TableNode` and `DomainLegend` read `domainCtx` from Svelte context reactively.
+5. In parallel on mount, `loadGroupConfig()` fetches `group-config.yaml` and populates `groupCtx.map`.
+6. `TableNode` and `GroupLegend` read `groupCtx` from Svelte context reactively.
 
 ---
 
@@ -179,20 +180,20 @@ A slot is classified as a foreign key (`is_fk: true`) when all three hold:
 
 Cross-schema FK targets (range names a class not present in the file) are silently skipped — no ghost nodes.
 
-### Domain annotations
+### Group annotations
 
-Classes may carry a `domain` annotation:
+Classes may carry a `group` annotation:
 
 ```yaml
 classes:
   person:
     annotations:
-      domain:
-        tag: domain
+      group:
+        tag: group
         value: clinical
 ```
 
-`parseRawLinkML()` reads `classDef.annotations?.domain?.value` and stores it as `ErdClass.domain`. The value must match a `name` key in `domain-config.yaml` to receive a color; unknown domain values fall back to the `default` entry.
+`parseRawLinkML()` reads `classDef.annotations?.group?.value` and stores it as `ErdClass.group`. The value must match a `name` key in `group-config.yaml` to receive a color; unknown group values fall back to the `default` entry.
 
 ### exact_mappings (ETL mappings)
 
@@ -223,12 +224,12 @@ Scanning all classes (not just the first) avoids misidentification when the firs
 
 ---
 
-## Domain configuration (`static/domain-config.yaml`)
+## Group configuration (`static/group-config.yaml`)
 
-Domain colors and labels are defined in `static/domain-config.yaml`, **not hardcoded in TypeScript**. This means new domains can be added by editing YAML only.
+Group colors and labels are defined in `static/group-config.yaml`, **not hardcoded in TypeScript**. This means new groups can be added by editing YAML only.
 
 ```yaml
-domains:
+groups:
   - name: clinical
     label: Clinical
     color: "#2563eb"
@@ -239,34 +240,34 @@ domains:
     text_color: "#ffffff"
 ```
 
-Each entry maps to the `DomainInfo` interface (`name`, `label`, `color`, `text_color`). The `default` entry is used as a fallback for classes whose domain value does not match any named entry; it is excluded from the `DomainLegend` swatch list.
+Each entry maps to the `GroupInfo` interface (`name`, `label`, `color`, `text_color`). The `default` entry is used as a fallback for classes whose group value does not match any named entry; it is excluded from the `GroupLegend` swatch list.
 
-`loadDomainConfig()` in `linkml.ts` fetches the file at runtime and returns a `Map<string, DomainInfo>` keyed by `name`.
+`loadGroupConfig()` in `linkml.ts` fetches the file at runtime and returns a `Map<string, GroupInfo>` keyed by `name`.
 
 ### Context pattern
 
-`+page.svelte` sets a reactive `$state` wrapper as Svelte context **synchronously at init time** so that child components (`TableNode`, `DomainLegend`) can call `getContext` during their own synchronous initialization:
+`+page.svelte` sets a reactive `$state` wrapper as Svelte context **synchronously at init time** so that child components (`TableNode`, `GroupLegend`) can call `getContext` during their own synchronous initialization:
 
 ```typescript
 // +page.svelte — at module script top level (NOT inside onMount)
-const domainCtx = $state<{ map: Map<string, DomainInfo> | null }>({ map: null });
-setContext('domainConfig', domainCtx);
+const groupCtx = $state<{ map: Map<string, GroupInfo> | null }>({ map: null });
+setContext('groupConfig', groupCtx);
 
 // Then in onMount, populate the map after the async fetch:
 onMount(() => {
-  loadDomainConfig().then((map) => { domainCtx.map = map; });
+  loadGroupConfig().then((map) => { groupCtx.map = map; });
 });
 ```
 
 Child components read the context and derive colors reactively:
 
 ```typescript
-// TableNode.svelte / DomainLegend.svelte
-const domainCtx = getContext<{ map: Map<string, DomainInfo> | null }>('domainConfig');
-const headerColor = $derived(domainCtx?.map?.get(rawData.domain)?.color ?? '#475569');
+// TableNode.svelte / GroupLegend.svelte
+const groupCtx = getContext<{ map: Map<string, GroupInfo> | null }>('groupConfig');
+const headerColor = $derived(groupCtx?.map?.get(rawData.group)?.color ?? '#475569');
 ```
 
-Because `domainCtx` is a `$state` object (not a plain value), mutations to `domainCtx.map` are visible reactively in all child `$derived` expressions without requiring a new `setContext` call.
+Because `groupCtx` is a `$state` object (not a plain value), mutations to `groupCtx.map` are visible reactively in all child `$derived` expressions without requiring a new `setContext` call.
 
 ---
 
@@ -301,14 +302,14 @@ Internal union types `FkEdge`, `EtlEdge`, `AnyEdge` carry a `kind` discriminant.
 
 Edge IDs are `source--slotName--target` for FK edges, with a counter suffix for duplicates. Isolated nodes (no layout position) are skipped silently.
 
-The `domain` field from `ErdClass` is propagated into `ErdNodeData` by both the Dagre and ELK build paths so that `TableNode` and `DomainLegend` can access it without querying the schema separately.
+The `group` field from `ErdClass` is propagated into `ErdNodeData` by both the Dagre and ELK build paths so that `TableNode` and `GroupLegend` can access it without querying the schema separately.
 
 ---
 
 ## Custom node (`src/lib/components/TableNode.svelte`)
 
-- Renders as a 260px-wide card with a **domain-colored header** (falls back to slate-600 for undomain-annotated classes).
-- Header color and text color are `$derived` from `domainCtx.map` read via `getContext('domainConfig')`. Updates reactively once the domain config fetch resolves.
+- Renders as a 260px-wide card with a **group-colored header** (falls back to slate-600 for unannotated classes).
+- Header color and text color are `$derived` from `groupCtx.map` read via `getContext('groupConfig')`. Updates reactively once the group config fetch resolves.
 - Click the header to toggle collapse.
 - Each slot row shows:
   - A badge: `PK` (amber) for identifiers, `FK` (slate) for foreign keys, blank for plain slots
@@ -321,19 +322,19 @@ The `domain` field from `ErdClass` is propagated into `ErdNodeData` by both the 
 
 ---
 
-## Domain legend (`src/lib/components/DomainLegend.svelte`)
+## Group legend (`src/lib/components/GroupLegend.svelte`)
 
-A left-side sidebar (`170px` wide, `border-right: 1px solid #e5e7eb`) rendered only when the loaded schema has at least one domain-annotated class (`hasDomains` derived in `+page.svelte`).
+A left-side sidebar (`170px` wide, `border-right: 1px solid #e5e7eb`) rendered only when the loaded schema has at least one group-annotated class (`hasGroups` derived in `+page.svelte`).
 
 Props:
-- `activeDomainNames: string[]` — the unique domain names found in the current `nodes` array, derived in `+page.svelte`.
+- `activeGroupNames: string[]` — the unique group names found in the current `nodes` array, derived in `+page.svelte`.
 
 Two sections:
-1. **Domains** — one row per active domain (colored `14×14` swatch + label). The `default` entry is excluded from this list.
+1. **Groups** — one row per active group (colored `14×14` swatch + label). The `default` entry is excluded from this list.
 2. **Legend** — slot row icon key: PK badge (amber), FK badge (slate), bold name = required, plain name = optional, indigo italic = ETL mapping.
 3. **Edges** — ETL edge row: dashed indigo swatch (`border-top: 2px dashed #6366f1`) + "ETL edge" label.
 
-The component reads `domainCtx` from Svelte context (same reactive wrapper set by `+page.svelte`), so it updates reactively once `loadDomainConfig()` resolves.
+The component reads `groupCtx` from Svelte context (same reactive wrapper set by `+page.svelte`), so it updates reactively once `loadGroupConfig()` resolves.
 
 ---
 
@@ -351,6 +352,25 @@ Props:
 - `layoutOptions: LayoutOptions` — current active layout to highlight the active button
 - `layoutLoading: boolean` — shows a spinner on the active layout button while running
 - `onlayoutselect: (opts: LayoutOptions) => void` — called when user clicks a layout button
+
+---
+
+## File list (`src/lib/components/FileList.svelte`)
+
+A left-side sidebar section showing the workspace files currently loaded.
+
+Props:
+- `files: WorkspaceFile[]` — list of loaded workspace files
+- `activeFileId: string | null` — ID of the currently displayed file (highlighted)
+- `onfileclick: (id: string) => void` — called when the user clicks a file row to switch to it
+- `onfileremove: (id: string) => void` — called when the user removes a file via the context menu
+
+Features:
+- Each row shows a file icon, truncated filename, and an optional import badge.
+- **Import badge**: shown when a file has `imports`. Green (`⇒N`) when all imports resolve to other files in the workspace; amber (`⚠N`) when one or more imports cannot be resolved. Hovering shows the import names or lists the unresolved stems.
+- **Context menu**: right-click a row to get a "Remove file" option. Dismissed by clicking outside.
+- The active file row is highlighted with a dark (`#1e293b`) background.
+- Import resolution is computed by `unresolvedImports(file)`: compares each import stem (case-insensitive) against the set of `WorkspaceFile.stem` values in the current workspace.
 
 ---
 
@@ -372,19 +392,19 @@ Props:
 
 ---
 
-## Domain editor (`src/lib/components/DomainEditor.svelte`)
+## Group editor (`src/lib/components/GroupEditor.svelte`)
 
-A 360px right slide-in panel for editing domain colors and labels live.
+A 360px right slide-in panel for editing group colors and labels live.
 
 - Grid layout: `grid-template-columns: 20px 1fr 1fr 28px 28px` — delete / name / label / bg color / text color.
 - Color pickers: native `<input type="color">` hidden behind a visible swatch `div`; `oninput` for live updates without requiring a confirm step.
 - Add row button (dashed border); delete button per row; the `default` entry's delete button is disabled.
-- A `$effect` re-syncs local `rows` when the `domains` prop changes (e.g. new schema loaded).
-- Fires `onchange(rows)` immediately on every change (no debounce); parent updates `domainCtx.map`.
+- A `$effect` re-syncs local `rows` when the `groups` prop changes (e.g. new schema loaded).
+- Fires `onchange(rows)` immediately on every change (no debounce); parent updates `groupCtx.map`.
 
 Props:
-- `domains: DomainInfo[]` — current domain list (derived from `domainCtx.map` in parent)
-- `onchange: (domains: DomainInfo[]) => void` — called on every edit
+- `groups: GroupInfo[]` — current group list (derived from `groupCtx.map` in parent)
+- `onchange: (groups: GroupInfo[]) => void` — called on every edit
 - `onclose: () => void` — called when the × button is clicked
 
 ---
@@ -400,17 +420,17 @@ Uses Svelte 5 runes throughout:
 | `$state` | `collapsed` | `Set<string>` of collapsed node IDs |
 | `$state` | `layoutOptions` | Active `LayoutOptions` (engine + direction) |
 | `$state` | `fitViewTrigger` | Counter incremented after layout to trigger `fitView` |
-| `$state` | `domainCtx` | `{ map: Map<string, DomainInfo> \| null }` — reactive wrapper set as context |
+| `$state` | `groupCtx` | `{ map: Map<string, GroupInfo> \| null }` — reactive wrapper set as context |
 | `$state` | `schemaEditorOpen` | Boolean — controls Schema editor panel visibility |
-| `$state` | `domainEditorOpen` | Boolean — controls Domain editor panel visibility |
+| `$state` | `groupEditorOpen` | Boolean — controls Group editor panel visibility |
 | `$state` | `schemaYamlText` | Raw YAML string for the Schema editor (kept in sync with loaded schema) |
 | `$state.raw` | `nodes` | `Node[]` — raw avoids deep reactivity overhead |
 | `$state.raw` | `edges` | `Edge[]` — raw avoids deep reactivity overhead |
 | `$effect` | — | Rebuilds `nodes`/`edges` (async IIFE with cancellation flag) when `schema`, `collapsed`, or `layoutOptions` changes |
 | `$derived` | `classCount`, `schemaName`, `tableCount` | Computed display values |
-| `$derived` | `activeDomainNames` | Unique domain strings present in current `nodes` |
-| `$derived` | `hasDomains` | `true` when `activeDomainNames.length > 0` — gates `DomainLegend` visibility |
-| `$derived` | `domainList` | `DomainInfo[]` array derived from `domainCtx.map` — passed to `DomainEditor` |
+| `$derived` | `activeGroupNames` | Unique group strings present in current `nodes` |
+| `$derived` | `hasGroups` | `true` when `activeGroupNames.length > 0` — gates `GroupLegend` visibility |
+| `$derived` | `groupList` | `GroupInfo[]` array derived from `groupCtx.map` — passed to `GroupEditor` |
 
 `$state.raw` is used for `nodes` and `edges` per the [Svelte Flow performance recommendation](https://github.com/sveltejs/svelte/issues/11851) — deep reactivity on large node arrays causes noticeable lag.
 
@@ -430,7 +450,7 @@ Uses Svelte 5 runes throughout:
 - **`setContext` must be called synchronously at component init** — calling it inside `onMount` or inside a `.then()` callback means child components have already called `getContext` and received `undefined`. Always declare the `$state` holder and call `setContext` at the top level of the `<script>` block.
 - **elkjs browser build**: import `elkjs/lib/elk.bundled.js` directly rather than the bare `elkjs` package entry. The default entry conditionally `require('web-worker')` in Node environments; in the browser this bare specifier is never resolved, producing a runtime "Failed to resolve module specifier \"web-worker\"" error. The bundled entry has no such dependency and requires no `vite.config.ts` workarounds.
 - **`labelBgStyle`** is not a valid property on the `@xyflow/svelte` `Edge` type — do not use it.
-- **LSP stale errors**: LSP may show stale type errors in `.svelte` files (e.g. `LayoutOptions` not found, `buildGraph` wrong arg count, `DomainInfo` not exported). These are false positives — `npm run build` is the ground truth.
+- **LSP stale errors**: LSP may show stale type errors in `.svelte` files (e.g. `LayoutOptions` not found, `buildGraph` wrong arg count, `GroupInfo` not exported). These are false positives — `npm run build` is the ground truth.
 
 ---
 
@@ -554,3 +574,9 @@ vite.config.ts
 - Svelte 5 runes: https://svelte.dev/docs/svelte/what-are-runes
 - Svelte docs: https://svelte.dev/docs
 - SvelteKit docs: https://svelte.dev/docs/kit
+
+---
+
+## Miscellaneous rules
+
+- Use https://linkml.io/linkml/developers/tool-developer-guide.html for LinkML tool development guidelines.

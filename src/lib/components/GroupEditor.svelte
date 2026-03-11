@@ -1,30 +1,30 @@
 <script lang="ts">
-  import type { DomainInfo } from '$lib/types';
+  import type { GroupInfo } from '$lib/types';
 
   interface Props {
-    domains: DomainInfo[];
-    onchange: (domains: DomainInfo[]) => void;
+    groups: GroupInfo[];
+    onchange: (groups: GroupInfo[]) => void;
     onclose: () => void;
   }
 
-  let { domains, onchange, onclose }: Props = $props();
+  let { groups, onchange, onclose }: Props = $props();
 
   // Work on a local mutable copy; fire onchange on every edit.
   // Use $state without initializer; $effect keeps it in sync with parent prop.
-  let rows = $state<DomainInfo[]>([]);
+  let rows = $state<GroupInfo[]>([]);
 
   // Keep rows in sync if parent pushes a new list (e.g. new schema loaded)
   $effect(() => {
-    rows = domains.map((d) => ({ ...d }));
+    rows = groups.map((d) => ({ ...d }));
   });
 
-  function update(index: number, field: keyof DomainInfo, value: string) {
+  function update(index: number, field: keyof GroupInfo, value: string) {
     rows = rows.map((r, i) => (i === index ? { ...r, [field]: value } : r));
     onchange(rows);
   }
 
   function addRow() {
-    const newRow: DomainInfo = { name: 'new_domain', label: 'New Domain', color: '#6b7280', text_color: '#ffffff' };
+    const newRow: GroupInfo = { name: 'new_group', label: 'New Group', color: '#6b7280', text_color: '#ffffff' };
     rows = [...rows, newRow];
     onchange(rows);
   }
@@ -35,13 +35,13 @@
   }
 
   // The 'default' entry should always exist and not be removable
-  const isDefault = (row: DomainInfo) => row.name === 'default';
+  const isDefault = (row: GroupInfo) => row.name === 'default';
 </script>
 
-<aside class="domain-editor-panel">
+<aside class="group-editor-panel">
   <div class="panel-header">
-    <span class="panel-title">Domain Colors</span>
-    <button class="close-btn" onclick={onclose} aria-label="Close domain editor">×</button>
+    <span class="panel-title">Group Colors</span>
+    <button class="close-btn" onclick={onclose} aria-label="Close group editor">×</button>
   </div>
 
   <div class="panel-body">
@@ -53,13 +53,13 @@
     </div>
 
     {#each rows as row, i}
-      <div class="domain-row" class:is-default={isDefault(row)}>
+      <div class="group-row" class:is-default={isDefault(row)}>
         <!-- Delete button -->
         <button
           class="delete-btn"
           onclick={() => removeRow(i)}
           disabled={isDefault(row)}
-          aria-label="Remove domain"
+          aria-label="Remove group"
           title={isDefault(row) ? 'The default entry cannot be removed' : 'Remove'}
         >×</button>
 
@@ -70,7 +70,7 @@
           value={row.name}
           oninput={(e) => update(i, 'name', (e.target as HTMLInputElement).value)}
           placeholder="name"
-          title="Domain key (must match annotation value in YAML)"
+          title="Group key (must match annotation value in YAML)"
         />
 
         <!-- Label -->
@@ -104,17 +104,17 @@
       </div>
     {/each}
 
-    <button class="add-btn" onclick={addRow}>+ Add domain</button>
+    <button class="add-btn" onclick={addRow}>+ Add group</button>
 
     <p class="hint">
-      The <strong>name</strong> field must match the <code>domain:</code> annotation value in your
-      LinkML YAML. The <strong>default</strong> entry is the fallback for unrecognised domain values.
+      The <strong>name</strong> field must match the <code>group:</code> annotation value in your
+      LinkML YAML. The <strong>default</strong> entry is the fallback for unrecognised group values.
     </p>
   </div>
 </aside>
 
 <style>
-  .domain-editor-panel {
+  .group-editor-panel {
     width: 360px;
     flex-shrink: 0;
     display: flex;
@@ -182,8 +182,8 @@
     color: #9ca3af;
   }
 
-  /* Each domain row */
-  .domain-row {
+  /* Each group row */
+  .group-row {
     display: grid;
     grid-template-columns: 20px 1fr 1fr 28px 28px;
     gap: 4px;
@@ -192,7 +192,7 @@
     border-radius: 4px;
   }
 
-  .domain-row.is-default {
+  .group-row.is-default {
     border-top: 1px solid #e5e7eb;
     margin-top: 4px;
     padding-top: 7px;

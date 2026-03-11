@@ -1,20 +1,20 @@
 <script lang="ts">
   import { getContext } from 'svelte';
-  import type { DomainInfo } from '$lib/types';
+  import type { GroupInfo } from '$lib/types';
 
-  // Receive list of domain names actually present in the current schema's nodes.
-  // Parent derives this from the rendered nodes so we only show relevant domains.
-  let { activeDomainNames }: { activeDomainNames: string[] } = $props();
+  // Receive list of group names actually present in the current schema's nodes.
+  // Parent derives this from the rendered nodes so we only show relevant groups.
+  let { activeGroupNames }: { activeGroupNames: string[] } = $props();
 
-  // Domain config injected by +page.svelte (same reactive wrapper as TableNode uses).
-  const domainCtx = getContext<{ map: Map<string, DomainInfo> | null }>('domainConfig');
+  // Group config injected by +page.svelte (same reactive wrapper as TableNode uses).
+  const groupCtx = getContext<{ map: Map<string, GroupInfo> | null }>('groupConfig');
 
-  // Build the ordered list: entries from the map that appear in activeDomainNames,
-  // preserving map insertion order. The 'default' entry is omitted from domain swatches.
-  const domainEntries = $derived((() => {
-    const map = domainCtx?.map;
-    if (!map) return [] as DomainInfo[];
-    const active = new Set(activeDomainNames);
+  // Build the ordered list: entries from the map that appear in activeGroupNames,
+  // preserving map insertion order. The 'default' entry is omitted from group swatches.
+  const groupEntries = $derived((() => {
+    const map = groupCtx?.map;
+    if (!map) return [] as GroupInfo[];
+    const active = new Set(activeGroupNames);
     return Array.from(map.values()).filter(
       (d) => d.name !== 'default' && active.has(d.name)
     );
@@ -22,14 +22,14 @@
 </script>
 
 <aside class="sidebar">
-  <!-- Domain color legend -->
-  {#if domainEntries.length > 0}
+  <!-- Group color legend -->
+  {#if groupEntries.length > 0}
     <section class="section">
-      <div class="section-title">Domains</div>
-      {#each domainEntries as d}
-        <div class="domain-row">
+      <div class="section-title">Groups</div>
+      {#each groupEntries as d}
+        <div class="group-row">
           <span class="swatch" style:background={d.color}></span>
-          <span class="domain-label">{d.label}</span>
+          <span class="group-label">{d.label}</span>
         </div>
       {/each}
     </section>
@@ -101,8 +101,8 @@
     margin: 0 12px;
   }
 
-  /* Domain swatches */
-  .domain-row {
+  /* Group swatches */
+  .group-row {
     display: flex;
     align-items: center;
     gap: 7px;
@@ -115,7 +115,7 @@
     flex-shrink: 0;
   }
 
-  .domain-label {
+  .group-label {
     font-size: 11px;
     color: #374151;
   }

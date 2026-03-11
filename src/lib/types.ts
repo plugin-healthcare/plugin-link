@@ -21,7 +21,7 @@ export interface ErdClass {
   name: string;
   description: string;
   slots: ErdSlot[];
-  domain?: string; // e.g. "clinical", "vocabulary", "hix" — from annotations.domain
+  group?: string; // e.g. "clinical", "vocabulary", "hix" — from annotations.group
 }
 
 /** The top-level normalized schema structure */
@@ -61,7 +61,7 @@ export interface RawLinkMLClass {
   attributes?: Record<string, RawLinkMLSlot>;
   is_a?: string;
   abstract?: boolean;
-  // annotations: arbitrary key → {tag, value} pairs or compact scalar (e.g. domain: clinical)
+  // annotations: arbitrary key → {tag, value} pairs or compact scalar (e.g. group: clinical)
   annotations?: Record<string, { tag: string; value: unknown } | string | number | boolean | null>;
 }
 
@@ -71,6 +71,35 @@ export interface RawLinkMLSchema {
   id?: string;
   classes?: Record<string, RawLinkMLClass>;
   slots?: Record<string, RawLinkMLSlot>;
+  /** Raw import list from the YAML (e.g. ["linkml:types", "hix", "sein-omop"]) */
+  imports?: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Workspace — multi-file upload and import resolution
+// ---------------------------------------------------------------------------
+
+/**
+ * A single file loaded into the workspace.
+ * Pre-parsed so import resolution is synchronous.
+ */
+export interface WorkspaceFile {
+  /** Stable unique identifier (crypto.randomUUID) */
+  id: string;
+  /** Original filename, e.g. "hix.yaml" */
+  name: string;
+  /** Filename without extension, used for import matching, e.g. "hix" */
+  stem: string;
+  /** Raw YAML/JSON text */
+  text: string;
+  /** Pre-parsed schema */
+  schema: NormalizedSchema;
+  /**
+   * User-defined import names from the raw YAML `imports:` list,
+   * with built-in linkml:* entries stripped.
+   * e.g. ["hix", "sein-omop"]
+   */
+  imports: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -83,20 +112,20 @@ export interface LayoutOptions {
 }
 
 // ---------------------------------------------------------------------------
-// Domain configuration — loaded from static/domain-config.yaml
+// Group configuration — loaded from static/group-config.yaml
 // ---------------------------------------------------------------------------
 
-/** One entry from domain-config.yaml */
-export interface DomainInfo {
+/** One entry from group-config.yaml */
+export interface GroupInfo {
   name: string;       // e.g. "clinical"
   label: string;      // e.g. "Clinical"
   color: string;      // hex header background, e.g. "#2563eb"
   text_color: string; // hex header text, e.g. "#ffffff"
 }
 
-/** Top-level shape of domain-config.yaml */
-export interface DomainConfig {
-  domains: DomainInfo[];
+/** Top-level shape of group-config.yaml */
+export interface GroupConfig {
+  groups: GroupInfo[];
 }
 
 // ---------------------------------------------------------------------------
@@ -109,7 +138,7 @@ export interface ErdNodeData {
   slots: ErdSlot[];
   collapsed: boolean;
   highlighted?: boolean;
-  domain?: string; // propagated from ErdClass.domain
+  group?: string; // propagated from ErdClass.group
 }
 
 export interface ErdEdgeData {

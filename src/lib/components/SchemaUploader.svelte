@@ -1,58 +1,123 @@
 <script lang="ts">
-  import { parseLinkMLSchema } from '$lib/linkml';
-  import type { NormalizedSchema } from '$lib/types';
+  import { parseWorkspaceFile } from '$lib/linkml';
+  import type { WorkspaceFile } from '$lib/types';
 
   interface Props {
-    onschema: (schema: NormalizedSchema) => void;
+    onfiles: (files: WorkspaceFile[]) => void;
     onreset: () => void;
-    onyaml?: (text: string) => void;
   }
 
-  let { onschema, onreset, onyaml }: Props = $props();
+  let { onfiles, onreset }: Props = $props();
 
   let dragging = $state(false);
-  let error = $state('');
+  let errors = $state<string[]>([]);
   let loading = $state(false);
   let open = $state(false);
   let fileInput: HTMLInputElement;
+  let folderInput: HTMLInputElement;
 
-  async function handleFile(file: File) {
-    if (!file) return;
-    const ext = file.name.split('.').pop()?.toLowerCase();
-    if (!['yaml', 'yml', 'json'].includes(ext ?? '')) {
-      error = 'Only .yaml, .yml, or .json files are supported';
-      return;
-    }
-    error = '';
+  // ---------------------------------------------------------------------------
+  // Process a flat list of File objects → WorkspaceFile[]
+  // ---------------------------------------------------------------------------
+  async function processFiles(files: File[]): Promise<void> {
+    if (files.length === 0) return;
+    errors = [];
     loading = true;
-    try {
-      const text = await file.text();
-      const schema = parseLinkMLSchema(text);
-      const classCount = Object.keys(schema.classes).length;
-      if (classCount === 0) {
-        error = 'No classes found in schema. Is this a valid LinkML schema?';
-        return;
+    const results: WorkspaceFile[] = [];
+    const errs: string[] = [];
+
+    for (const file of files) {
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      if (!['yaml', 'yml', 'json'].includes(ext ?? '')) {
+        errs.push(`${file.name}: only .yaml, .yml, .json files are supported`);
+        continue;
       }
-      onyaml?.(text);
-      onschema(schema);
+      try {
+        const text = await file.text();
+        const wf = parseWorkspaceFile(file.name, text);
+        const hasClasses = Object.keys(wf.schema.classes).length > 0;
+        const hasImports = wf.imports.length > 0;
+        if (!hasClasses && !hasImports) {
+          errs.push(`${file.name}: no classes or imports found — is this a valid LinkML schema?`);
+          continue;
+        }
+        results.push(wf);
+      } catch (e) {
+        errs.push(`${file.name}: ${(e as Error).message}`);
+      }
+    }
+
+    loading = false;
+    errors = errs;
+
+    if (results.length > 0) {
+      onfiles(results);
       open = false;
-    } catch (e) {
-      error = `Failed to parse schema: ${(e as Error).message}`;
-    } finally {
-      loading = false;
     }
   }
 
-  function onDrop(e: DragEvent) {
+  // ---------------------------------------------------------------------------
+  // Recursively walk a DataTransferItem directory entry → File[]
+  // ---------------------------------------------------------------------------
+  async function readEntry(entry: FileSystemEntry): Promise<File[]> {
+    if (entry.isFile) {
+      return new Promise((resolve) => {
+        (entry as FileSystemFileEntry).file(
+          (f) => resolve([f]),
+          () => resolve([])
+        );
+      });
+    }
+    if (entry.isDirectory) {
+      const reader = (entry as FileSystemDirectoryEntry).createReader();
+      const entries = await new Promise<FileSystemEntry[]>((resolve) => {
+        reader.readEntries(resolve, () => resolve([]));
+      });
+      const nested = await Promise.all(entries.map(readEntry));
+      return nested.flat();
+    }
+    return [];
+  }
+
+  // ---------------------------------------------------------------------------
+  // Drag-and-drop: handles both plain files and directory drops
+  // ---------------------------------------------------------------------------
+  async function onDrop(e: DragEvent) {
     e.preventDefault();
     dragging = false;
-    const file = e.dataTransfer?.files[0];
-    if (file) handleFile(file);
+    const items = e.dataTransfer?.items;
+    if (items && items.length > 0) {
+      const entries: FileSystemEntry[] = [];
+      for (let i = 0; i < items.length; i++) {
+        const entry = items[i].webkitGetAsEntry?.();
+        if (entry) entries.push(entry);
+      }
+      if (entries.length > 0) {
+        loading = true;
+        const nested = await Promise.all(entries.map(readEntry));
+        const files = nested.flat();
+        await processFiles(files);
+        return;
+      }
+    }
+    // Fallback: plain DataTransfer.files
+    const files = Array.from(e.dataTransfer?.files ?? []);
+    await processFiles(files);
   }
 
-  function onFileChange(e: Event) {
-    const file = (e.target as HTMLInputElement).files?.[0];
-    if (file) handleFile(file);
+  // ---------------------------------------------------------------------------
+  // File input change handlers
+  // ---------------------------------------------------------------------------
+  async function onFileInputChange(e: Event) {
+    const files = Array.from((e.target as HTMLInputElement).files ?? []);
+    (e.target as HTMLInputElement).value = ''; // reset so same files can be re-added
+    await processFiles(files);
+  }
+
+  async function onFolderInputChange(e: Event) {
+    const files = Array.from((e.target as HTMLInputElement).files ?? []);
+    (e.target as HTMLInputElement).value = '';
+    await processFiles(files);
   }
 </script>
 
@@ -76,39 +141,56 @@
       {#if loading}
         <div class="drop-content">
           <span class="spin">⟳</span>
-          <span>Parsing schema…</span>
+          <span>Parsing schemas…</span>
         </div>
       {:else}
         <div class="drop-content">
           <span class="drop-icon">📂</span>
-          <span class="drop-label">Drop a LinkML schema here</span>
-          <span class="drop-sub">.yaml or .yml (preferred), .json</span>
-          <button class="browse-btn" onclick={() => fileInput.click()}>
-            Browse files
-          </button>
+          <span class="drop-label">Drop files or a folder here</span>
+          <span class="drop-sub">.yaml / .yml (preferred), .json · multiple files OK</span>
+          <div class="browse-row">
+            <button class="browse-btn" onclick={() => fileInput.click()}>
+              Browse files
+            </button>
+            <button class="browse-btn browse-btn-secondary" onclick={() => folderInput.click()}>
+              Browse folder
+            </button>
+          </div>
         </div>
       {/if}
     </div>
 
-    {#if error}
-      <p class="error-msg">⚠ {error}</p>
+    {#if errors.length > 0}
+      <div class="error-list">
+        {#each errors as err}
+          <p class="error-msg">⚠ {err}</p>
+        {/each}
+      </div>
     {/if}
 
     <div class="panel-actions">
-      <button class="reset-btn" onclick={() => { onreset(); open = false; error = ''; }}>
+      <button class="reset-btn" onclick={() => { onreset(); open = false; errors = []; }}>
         ↺ Load OMOP CDM example
       </button>
     </div>
   </div>
 {/if}
 
-<!-- Hidden file input -->
+<!-- Hidden file inputs -->
 <input
   bind:this={fileInput}
   type="file"
   accept=".yaml,.yml,.json"
+  multiple
   style="display:none"
-  onchange={onFileChange}
+  onchange={onFileInputChange}
+/>
+<input
+  bind:this={folderInput}
+  type="file"
+  style="display:none"
+  webkitdirectory
+  onchange={onFolderInputChange}
 />
 
 <style>
@@ -134,7 +216,7 @@
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
-    width: 280px;
+    width: 300px;
     background: #fff;
     border: 1px solid #e5e7eb;
     border-radius: 8px;
@@ -182,8 +264,13 @@
     color: #9ca3af;
   }
 
-  .browse-btn {
+  .browse-row {
+    display: flex;
+    gap: 6px;
     margin-top: 4px;
+  }
+
+  .browse-btn {
     padding: 5px 14px;
     background: #475569;
     color: #fff;
@@ -192,10 +279,20 @@
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
+    transition: background 0.12s ease;
   }
 
   .browse-btn:hover {
     background: #334155;
+  }
+
+  .browse-btn-secondary {
+    background: #e2e8f0;
+    color: #374151;
+  }
+
+  .browse-btn-secondary:hover {
+    background: #cbd5e1;
   }
 
   .spin {
@@ -206,7 +303,13 @@
 
   @keyframes spin {
     from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    to   { transform: rotate(360deg); }
+  }
+
+  .error-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
   }
 
   .error-msg {

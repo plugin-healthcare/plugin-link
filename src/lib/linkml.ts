@@ -18,8 +18,9 @@ import type {
   ErdSlot,
   RawLinkMLSchema,
   RawLinkMLSlot,
-  DomainConfig,
-  DomainInfo,
+  GroupConfig,
+  GroupInfo,
+  WorkspaceFile,
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -28,8 +29,8 @@ import type {
 
 /**
  * Read a LinkML annotation value in either form:
- *   compact:  domain: clinical          → annotation is the string "clinical"
- *   expanded: domain: {tag: domain, value: clinical} → annotation.value is "clinical"
+ *   compact:  group: clinical          → annotation is the string "clinical"
+ *   expanded: group: {tag: group, value: clinical} → annotation.value is "clinical"
  */
 function readAnnotation(
   annotation: { tag: string; value: unknown } | string | number | boolean | null | undefined
@@ -200,7 +201,7 @@ function parseRawLinkML(raw: RawLinkMLSchema): NormalizedSchema {
       name: className,
       description: String(classDef.description ?? ''),
       slots,
-      domain: readAnnotation(classDef.annotations?.domain),
+      group: readAnnotation(classDef.annotations?.group),
     };
   }
 
@@ -253,17 +254,64 @@ export async function loadDefaultSchema(): Promise<NormalizedSchema> {
 }
 
 /**
- * Load domain color/label configuration from the static YAML asset.
- * Returns a Map keyed by domain name for O(1) lookup in TableNode.
+ * Load group color/label configuration from the static YAML asset.
+ * Returns a Map keyed by group name for O(1) lookup in TableNode.
  */
-export async function loadDomainConfig(): Promise<Map<string, DomainInfo>> {
-  const res = await fetch(`${base}/domain-config.yaml`);
-  if (!res.ok) throw new Error(`Failed to load domain config: ${res.statusText}`);
+export async function loadGroupConfig(): Promise<Map<string, GroupInfo>> {
+  const res = await fetch(`${base}/group-config.yaml`);
+  if (!res.ok) throw new Error(`Failed to load group config: ${res.statusText}`);
   const text = await res.text();
-  const raw = yaml.load(text) as DomainConfig;
-  const map = new Map<string, DomainInfo>();
-  for (const entry of raw.domains ?? []) {
+  const raw = yaml.load(text) as GroupConfig;
+  const map = new Map<string, GroupInfo>();
+  for (const entry of raw.groups ?? []) {
     map.set(entry.name, entry);
   }
   return map;
+}
+
+/**
+ * Extract user-defined import names from a raw YAML string or object.
+ * Strips built-in linkml:* entries (e.g. "linkml:types").
+ * Returns e.g. ["hix", "sein-omop"] for `imports: [linkml:types, hix, sein-omop]`.
+ */
+export function extractImports(input: unknown): string[] {
+  let raw: unknown = input;
+  if (typeof input === 'string') {
+    const trimmed = input.trimStart();
+    try {
+      raw = trimmed.startsWith('{') || trimmed.startsWith('[')
+        ? JSON.parse(input)
+        : yaml.load(input);
+    } catch {
+      return [];
+    }
+  }
+  if (typeof raw !== 'object' || raw === null) return [];
+  const imports = (raw as Record<string, unknown>).imports;
+  if (!Array.isArray(imports)) return [];
+  return imports
+    .map((v) => String(v).trim())
+    .filter((v) => v.length > 0 && !v.startsWith('linkml:'));
+}
+
+/**
+ * Parse a raw YAML/JSON text into a WorkspaceFile, extracting both the
+ * NormalizedSchema and the list of user-defined imports.
+ * Throws if the text cannot be parsed or contains no classes.
+ */
+export function parseWorkspaceFile(name: string, text: string): WorkspaceFile {
+  const schema = parseLinkMLSchema(text);
+  const imports = extractImports(text);
+  // Derive stem: strip last extension, keep basename only
+  const basename = name.includes('/') ? name.slice(name.lastIndexOf('/') + 1) : name;
+  const dotIdx = basename.lastIndexOf('.');
+  const stem = dotIdx > 0 ? basename.slice(0, dotIdx) : basename;
+  return {
+    id: crypto.randomUUID(),
+    name: basename,
+    stem,
+    text,
+    schema,
+    imports,
+  };
 }

@@ -12,23 +12,30 @@
   import SchemaUploader from '$lib/components/SchemaUploader.svelte';
   import SearchBar from '$lib/components/SearchBar.svelte';
   import FlowController from '$lib/components/FlowController.svelte';
-  import DomainLegend from '$lib/components/DomainLegend.svelte';
+  import GroupLegend from '$lib/components/GroupLegend.svelte';
   import CustomControls from '$lib/components/CustomControls.svelte';
   import SchemaEditor from '$lib/components/SchemaEditor.svelte';
-  import DomainEditor from '$lib/components/DomainEditor.svelte';
+  import GroupEditor from '$lib/components/GroupEditor.svelte';
+  import FileList from '$lib/components/FileList.svelte';
 
-  import { loadDefaultSchema, loadDomainConfig, parseLinkMLSchema } from '$lib/linkml';
+  import { loadGroupConfig, parseWorkspaceFile } from '$lib/linkml';
   import { buildGraph } from '$lib/layout';
-  import type { NormalizedSchema, LayoutOptions, DomainInfo } from '$lib/types';
+  import type {
+    NormalizedSchema,
+    LayoutOptions,
+    GroupInfo,
+    WorkspaceFile,
+    ErdClass,
+  } from '$lib/types';
   import { base } from '$app/paths';
 
   // ---------------------------------------------------------------------------
-  // Domain config — set context synchronously with a reactive holder so
+  // Group config — set context synchronously with a reactive holder so
   // TableNode can read it reactively once the fetch resolves.
   // setContext must be called at init time (not inside onMount/async).
   // ---------------------------------------------------------------------------
-  const domainCtx = $state<{ map: Map<string, DomainInfo> | null }>({ map: null });
-  setContext('domainConfig', domainCtx);
+  const groupCtx = $state<{ map: Map<string, GroupInfo> | null }>({ map: null });
+  setContext('groupConfig', groupCtx);
 
   // ---------------------------------------------------------------------------
   // Node types registration
@@ -36,9 +43,76 @@
   const nodeTypes = { table: TableNode };
 
   // ---------------------------------------------------------------------------
-  // State
+  // Workspace state — list of loaded files + which is active
   // ---------------------------------------------------------------------------
-  let schema = $state<NormalizedSchema | null>(null);
+  let workspaceFiles = $state<WorkspaceFile[]>([]);
+  let activeFileId = $state<string | null>(null);
+
+  // ---------------------------------------------------------------------------
+  // Import resolution
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Recursively resolve imports for a given file against the workspace.
+   * Returns the merged NormalizedSchema and a list of unresolvable import names.
+   */
+  function resolveImports(
+    file: WorkspaceFile,
+    allFiles: WorkspaceFile[],
+    visited = new Set<string>(),
+    depth = 0
+  ): { merged: NormalizedSchema; unresolved: string[] } {
+    const MAX_DEPTH = 6;
+    const stemMap = new Map(allFiles.map((f) => [f.stem.toLowerCase(), f]));
+    const mergedClasses: Record<string, ErdClass> = {};
+    const unresolved: string[] = [];
+
+    // Process imports first (so the active file's classes can override)
+    if (depth < MAX_DEPTH) {
+      for (const imp of file.imports) {
+        const key = imp.toLowerCase();
+        if (visited.has(key)) continue;
+        visited.add(key);
+
+        const imported = stemMap.get(key);
+        if (!imported) {
+          unresolved.push(imp);
+          continue;
+        }
+        const sub = resolveImports(imported, allFiles, visited, depth + 1);
+        Object.assign(mergedClasses, sub.merged.classes);
+        unresolved.push(...sub.unresolved);
+      }
+    }
+
+    // Active file's own classes override imports
+    Object.assign(mergedClasses, file.schema.classes);
+
+    return {
+      merged: {
+        name: file.schema.name,
+        description: file.schema.description,
+        id: file.schema.id,
+        classes: mergedClasses,
+      },
+      unresolved: [...new Set(unresolved)],
+    };
+  }
+
+  // Derived: the schema rendered on the canvas (active file + resolved imports)
+  const resolvedResult = $derived((() => {
+    if (!activeFileId || workspaceFiles.length === 0) return null;
+    const active = workspaceFiles.find((f) => f.id === activeFileId);
+    if (!active) return null;
+    return resolveImports(active, workspaceFiles);
+  })());
+
+  const schema = $derived(resolvedResult?.merged ?? null);
+  const unresolvedImports = $derived(resolvedResult?.unresolved ?? []);
+
+  // ---------------------------------------------------------------------------
+  // Other derived values
+  // ---------------------------------------------------------------------------
   let loadError = $state('');
   let collapsed = $state<Set<string>>(new Set());
 
@@ -58,21 +132,27 @@
 
   // Editor panel visibility
   let schemaEditorOpen = $state(false);
-  let domainEditorOpen = $state(false);
+  let groupEditorOpen = $state(false);
 
-  // Raw YAML text kept in sync with the current schema (for SchemaEditor)
-  let schemaYamlText = $state('');
+  // Raw YAML text for SchemaEditor — tracks the active file's text
+  const schemaYamlText = $derived(
+    workspaceFiles.find((f) => f.id === activeFileId)?.text ?? ''
+  );
 
-  // Domain list derived from domainCtx.map for DomainEditor
-  const domainList = $derived<DomainInfo[]>(
-    domainCtx.map ? Array.from(domainCtx.map.values()) : []
+  // Group list derived from groupCtx.map for GroupEditor
+  const groupList = $derived<GroupInfo[]>(
+    groupCtx.map ? Array.from(groupCtx.map.values()) : []
   );
 
   // ---------------------------------------------------------------------------
   // Rebuild graph whenever schema, collapsed, or layoutOptions change (async)
   // ---------------------------------------------------------------------------
   $effect(() => {
-    if (!schema) return;
+    if (!schema) {
+      nodes = [];
+      edges = [];
+      return;
+    }
 
     // Capture reactive dependencies before entering async context
     const s = schema;
@@ -105,45 +185,78 @@
   // ---------------------------------------------------------------------------
   // Schema loading
   // ---------------------------------------------------------------------------
+
+  /** Replace workspace with a single default file (OMOP CDM). */
   async function loadDefault() {
     loadError = '';
     try {
-      // Fetch raw text so we can populate the schema editor
       const text = await fetch(`${base}/omop_cdm.yaml`).then((r) => r.text());
-      schema = parseLinkMLSchema(text);
-      schemaYamlText = text;
+      const wf = parseWorkspaceFile('omop_cdm.yaml', text);
+      workspaceFiles = [wf];
+      activeFileId = wf.id;
       collapsed = new Set();
     } catch (e) {
       loadError = `Failed to load default schema: ${(e as Error).message}`;
     }
   }
 
-  function handleUploadedSchema(s: NormalizedSchema) {
-    schema = s;
+  /**
+   * Add newly uploaded files to the workspace.
+   * Deduplicates by stem (case-insensitive); existing files with the same stem
+   * are replaced so that re-uploading a revised file works naturally.
+   */
+  function handleUploadedFiles(incoming: WorkspaceFile[]) {
+    const map = new Map(workspaceFiles.map((f) => [f.stem.toLowerCase(), f]));
+    for (const f of incoming) {
+      map.set(f.stem.toLowerCase(), f);
+    }
+    workspaceFiles = Array.from(map.values());
+    // Activate the first incoming file (or keep current if it's still present)
+    const currentStillPresent = workspaceFiles.some((f) => f.id === activeFileId);
+    if (!currentStillPresent || !activeFileId) {
+      activeFileId = incoming[0]?.id ?? workspaceFiles[0]?.id ?? null;
+    }
     collapsed = new Set();
   }
 
-  function handleUploadedYaml(text: string) {
-    schemaYamlText = text;
+  /** Switch the active (rendered) file. */
+  function handleFileClick(id: string) {
+    if (id === activeFileId) return;
+    activeFileId = id;
+    collapsed = new Set();
   }
 
-  // Called by SchemaEditor when the user edits the YAML and it parses cleanly
+  /** Remove a file from the workspace. */
+  function handleFileRemove(id: string) {
+    workspaceFiles = workspaceFiles.filter((f) => f.id !== id);
+    if (activeFileId === id) {
+      activeFileId = workspaceFiles[0]?.id ?? null;
+      collapsed = new Set();
+    }
+  }
+
+  // Called by SchemaEditor when the user edits the YAML and it parses cleanly.
+  // Updates the active WorkspaceFile in-place.
   function handleSchemaEditorChange(text: string, parsed: NormalizedSchema) {
-    schemaYamlText = text;
-    schema = parsed;
+    if (!activeFileId) return;
+    workspaceFiles = workspaceFiles.map((f) =>
+      f.id === activeFileId
+        ? { ...f, text, schema: parsed }
+        : f
+    );
     collapsed = new Set();
   }
 
-  // Called by DomainEditor when colors/names change
-  function handleDomainEditorChange(domains: DomainInfo[]) {
-    domainCtx.map = new Map(domains.map((d) => [d.name, d]));
+  // Called by GroupEditor when colors/names change
+  function handleGroupEditorChange(groups: GroupInfo[]) {
+    groupCtx.map = new Map(groups.map((d) => [d.name, d]));
   }
 
   onMount(() => {
     loadDefault();
-    loadDomainConfig()
-      .then((map: Map<string, DomainInfo>) => { domainCtx.map = map; })
-      .catch((e: unknown) => console.warn('domain-config load failed:', e));
+    loadGroupConfig()
+      .then((map: Map<string, GroupInfo>) => { groupCtx.map = map; })
+      .catch((e: unknown) => console.warn('group-config load failed:', e));
   });
 
   // ---------------------------------------------------------------------------
@@ -178,18 +291,17 @@
   const schemaName = $derived(schema?.name ?? 'Loading…');
   const tableCount = $derived(nodes.filter((n) => n.type === 'table').length);
 
-  // Collect unique domain names present in current nodes (for DomainLegend).
-  // Cast via unknown because Node data is typed as Record<string,unknown>.
-  const activeDomainNames = $derived(
+  // Collect unique group names present in current nodes (for GroupLegend).
+  const activeGroupNames = $derived(
     [...new Set(
       nodes
-        .map((n) => (n.data as unknown as { domain?: string }).domain)
+        .map((n) => (n.data as unknown as { group?: string }).group)
         .filter((d): d is string => typeof d === 'string')
     )]
   );
 
-  // Only show the legend when at least one node has a domain annotation.
-  const hasDomains = $derived(activeDomainNames.length > 0);
+  // Only show the legend when at least one node has a group annotation.
+  const hasGroups = $derived(activeGroupNames.length > 0);
 
   // Edge count label: distinguish FK vs ETL
   const fkEdgeCount = $derived(
@@ -203,10 +315,21 @@
 <svelte:window onkeydown={handleGlobalKeydown} />
 
 <div class="app">
-  <!-- Domain legend sidebar — only shown when schema has domain-annotated classes -->
-  {#if schema && hasDomains}
-    <DomainLegend {activeDomainNames} />
-  {/if}
+  <!-- Left sidebar: file list + optional domain legend -->
+  <div class="sidebar-col">
+    {#if workspaceFiles.length > 0}
+      <FileList
+        files={workspaceFiles}
+        {activeFileId}
+        onfileclick={handleFileClick}
+        onfileremove={handleFileRemove}
+      />
+    {/if}
+
+    {#if schema && hasGroups}
+      <GroupLegend {activeGroupNames} />
+    {/if}
+  </div>
 
   <div class="canvas-wrap">
     <!-- Top bar -->
@@ -221,7 +344,11 @@
             {#if etlEdgeCount > 0} · {etlEdgeCount} ETL{/if}
           </span>
         {/if}
-        {#if loadError}
+        {#if unresolvedImports.length > 0}
+          <span class="load-error" title="Add the missing files to resolve: {unresolvedImports.join(', ')}">
+            ⚠ unresolved: {unresolvedImports.join(', ')}
+          </span>
+        {:else if loadError}
           <span class="load-error">⚠ {loadError}</span>
         {/if}
       </div>
@@ -243,23 +370,22 @@
           Schema
         </button>
 
-        <!-- Domain config editor toggle -->
+        <!-- Group config editor toggle -->
         <button
           class="editor-btn"
-          class:active={domainEditorOpen}
-          title="Edit domain colors"
-          onclick={() => { domainEditorOpen = !domainEditorOpen; }}
-          aria-pressed={domainEditorOpen}
+          class:active={groupEditorOpen}
+          title="Edit group colors"
+          onclick={() => { groupEditorOpen = !groupEditorOpen; }}
+          aria-pressed={groupEditorOpen}
         >
           <span class="editor-btn-icon">&#9678;</span>
-          Domains
+          Groups
         </button>
 
         <div class="uploader-wrap">
           <SchemaUploader
-            onschema={handleUploadedSchema}
+            onfiles={handleUploadedFiles}
             onreset={loadDefault}
-            onyaml={handleUploadedYaml}
           />
         </div>
       </div>
@@ -295,10 +421,10 @@
             />
             <MiniMap
               nodeColor={(n) => {
-                const domain = (n.data as unknown as { domain?: string }).domain;
-                const map = domainCtx.map;
-                if (!domain || !map) return '#475569';
-                return map.get(domain)?.color ?? map.get('default')?.color ?? '#475569';
+                const group = (n.data as unknown as { group?: string }).group;
+                const map = groupCtx.map;
+                if (!group || !map) return '#475569';
+                return map.get(group)?.color ?? map.get('default')?.color ?? '#475569';
               }}
               nodeStrokeWidth={3}
               zoomable
@@ -327,12 +453,12 @@
         />
       {/if}
 
-      <!-- Domain color editor panel -->
-      {#if domainEditorOpen}
-        <DomainEditor
-          domains={domainList}
-          onchange={handleDomainEditorChange}
-          onclose={() => { domainEditorOpen = false; }}
+      <!-- Group color editor panel -->
+      {#if groupEditorOpen}
+        <GroupEditor
+          groups={groupList}
+          onchange={handleGroupEditorChange}
+          onclose={() => { groupEditorOpen = false; }}
         />
       {/if}
     </div>
@@ -346,6 +472,23 @@
     width: 100vw;
     font-family: ui-sans-serif, system-ui, sans-serif;
     background: #f3f4f6;
+  }
+
+  /* Left sidebar column: stacks FileList above DomainLegend */
+  .sidebar-col {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    width: 180px;
+    background: #fff;
+    border-right: 1px solid #e5e7eb;
+    overflow-y: auto;
+    z-index: 10;
+  }
+
+  /* Hide the sidebar column entirely when it has no children to show */
+  .sidebar-col:empty {
+    display: none;
   }
 
   .canvas-wrap {
@@ -394,13 +537,6 @@
     flex-shrink: 0;
   }
 
-  .topbar-left {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-width: 0;
-  }
-
   .app-title {
     font-size: 14px;
     font-weight: 700;
@@ -428,13 +564,7 @@
   .load-error {
     font-size: 11px;
     color: #dc2626;
-  }
-
-  .topbar-right {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
+    cursor: default;
   }
 
   /* Editor toggle buttons */

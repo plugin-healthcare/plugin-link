@@ -1,7 +1,7 @@
 <script lang="ts">
   import { getContext } from 'svelte';
   import { Handle, Position, type NodeProps, type Node } from '@xyflow/svelte';
-  import type { ErdNodeData, ErdSlot, DomainInfo } from '$lib/types';
+  import type { ErdNodeData, ErdSlot, GroupInfo } from '$lib/types';
 
   // Accept the base unparameterised NodeProps — re-derive our data shape below.
   // (Svelte Flow v1 generics clash with TypeScript strict mode; see layout.ts.)
@@ -11,27 +11,27 @@
   // rebuilds the node. The cast is intentional — see layout.ts for rationale.
   const rawData = $derived(data as unknown as ErdNodeData);
 
-  // Domain config injected by +page.svelte via setContext.
+  // Group config injected by +page.svelte via setContext.
   // The context holds a reactive $state wrapper { map } so that updates
   // after the async fetch are visible here without re-running getContext.
-  const domainCtx = getContext<{ map: Map<string, DomainInfo> | null }>('domainConfig');
+  const groupCtx = getContext<{ map: Map<string, GroupInfo> | null }>('groupConfig');
 
-  // Default fallback when no domain config or unknown domain
+  // Default fallback when no group config or unknown group
   const DEFAULT_COLOR = '#475569';
   const DEFAULT_TEXT = '#ffffff';
 
   const headerColor = $derived((() => {
-    const domain = rawData.domain;
-    const map = domainCtx?.map;
-    if (!domain || !map) return DEFAULT_COLOR;
-    return map.get(domain)?.color ?? map.get('default')?.color ?? DEFAULT_COLOR;
+    const group = rawData.group;
+    const map = groupCtx?.map;
+    if (!group || !map) return DEFAULT_COLOR;
+    return map.get(group)?.color ?? map.get('default')?.color ?? DEFAULT_COLOR;
   })());
 
   const headerText = $derived((() => {
-    const domain = rawData.domain;
-    const map = domainCtx?.map;
-    if (!domain || !map) return DEFAULT_TEXT;
-    return map.get(domain)?.text_color ?? map.get('default')?.text_color ?? DEFAULT_TEXT;
+    const group = rawData.group;
+    const map = groupCtx?.map;
+    if (!group || !map) return DEFAULT_TEXT;
+    return map.get(group)?.text_color ?? map.get('default')?.text_color ?? DEFAULT_TEXT;
   })());
 
   // ---------------------------------------------------------------------------

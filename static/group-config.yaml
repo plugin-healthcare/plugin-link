@@ -1,9 +1,9 @@
-# Domain configuration for the ERD viewer.
-# Each entry defines how a class domain is displayed (header color, label).
-# Colors match the omop-link DOMAIN_INFO palette exactly for OMOP domains.
-# Add new domains here — no code changes required.
+# Group configuration for the ERD viewer.
+# Each entry defines how a class group is displayed (header color, label).
+# Colors match the omop-link DOMAIN_INFO palette exactly for OMOP groups.
+# Add new groups here — no code changes required.
 
-domains:
+groups:
   - name: clinical
     label: Clinical
     color: "#2563eb"

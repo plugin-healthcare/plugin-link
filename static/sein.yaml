@@ -28,7 +28,7 @@ classes:
     name: AdmissionOrigins
     annotations:
       source_table: opname_herkomst
-      domain: hix
+      group: hix
     description: 'Staging model for HiX source table: opname_herkomst'
     attributes:
       admission_origin_id:
@@ -47,7 +47,7 @@ classes:
     name: AdmissionTypes
     annotations:
       source_table: opname_opntype1
-      domain: hix
+      group: hix
     description: 'Staging model for HiX source table: opname_opntype1'
     attributes:
       admission_type_id:
@@ -66,7 +66,7 @@ classes:
     name: Admissions
     annotations:
       source_table: opname_opname
-      domain: hix
+      group: hix
     description: 'Staging model for HiX source table: opname_opname'
     attributes:
       admission_id:
@@ -156,7 +156,7 @@ classes:
     name: ConsultCategories
     annotations:
       source_table: consult_category
-      domain: hix
+      group: hix
     description: 'Staging model for HiX source table: consult_category'
     attributes:
       consult_category_id:
@@ -177,7 +177,7 @@ classes:
     name: Consults
     annotations:
       source_table: consult_regpart
-      domain: hix
+      group: hix
     description: 'Staging model for HiX source table: consult_regpart'
     attributes:
       consult_id:
@@ -249,7 +249,7 @@ classes:
     name: DiagnoseCode
     annotations:
       source_table: episode_diag
-      domain: hix
+      group: hix
     description: 'Staging model for HiX source table: episode_diag'
     attributes:
       diagnosis_code:
@@ -290,7 +290,7 @@ classes:
     name: DiagnosesAndTreatments
     annotations:
       source_table: episode_dbcper
-      domain: hix
+      group: hix
     description: 'Staging model for HiX source table: episode_dbcper'
     attributes:
       diagnosis_treatment_id:
@@ -392,7 +392,7 @@ classes:
     name: Episodes
     annotations:
       source_table: episode_episode
-      domain: hix
+      group: hix
     description: 'Staging model for HiX source table: episode_episode'
     attributes:
       episode_id:
@@ -467,7 +467,7 @@ classes:
     name: LabRequests
     annotations:
       source_table: lab_l_aanvrg
-      domain: hix
+      group: hix
     description: 'Staging model for HiX source table: lab_l_aanvrg'
     attributes:
       lab_request_id:
@@ -528,7 +528,7 @@ classes:
     name: Medication
     annotations:
       source_table: medicat_recdeel
-      domain: hix
+      group: hix
     description: 'Staging model for HiX source table: medicat_recdeel'
     attributes:
       prescription_id:
@@ -655,7 +655,7 @@ classes:
     name: Medicines
     annotations:
       source_table: medicat_medicijn
-      domain: hix
+      group: hix
     description: 'Staging model for HiX source table: medicat_medicijn'
     attributes:
       medicine_id:
@@ -702,7 +702,7 @@ classes:
     name: Patients
     annotations:
       source_table: patient_patient
-      domain: hix
+      group: hix
     description: 'Staging model for HiX source table: patient_patient'
     attributes:
       patient_number:
@@ -779,7 +779,7 @@ classes:
     name: Units
     annotations:
       source_table: medicat_eenheid
-      domain: hix
+      group: hix
     description: 'Staging model for HiX source table: medicat_eenheid'
     attributes:
       unit_id:
@@ -803,7 +803,7 @@ classes:
   CdmSource:
     name: CdmSource
     annotations:
-      domain: infrastructure
+      group: infrastructure
     description: The CDM_SOURCE table contains detail about the source database and
       the process used to transform the data into the OMOP Common Data Model.
     attributes:
@@ -851,7 +851,7 @@ classes:
   ConceptAncestor:
     name: ConceptAncestor
     annotations:
-      domain: vocabulary
+      group: vocabulary
     description: The CONCEPT_ANCESTOR table is designed to simplify observational
       analysis by providing the complete hierarchical relationships between Concepts.
     attributes:
@@ -881,7 +881,7 @@ classes:
   ConceptClass:
     name: ConceptClass
     annotations:
-      domain: vocabulary
+      group: vocabulary
     description: The CONCEPT_CLASS table includes semantic categories that reference
       the source structure of each Vocabulary.
     attributes:
@@ -903,7 +903,7 @@ classes:
   ConceptRelation:
     name: ConceptRelation
     annotations:
-      domain: vocabulary
+      group: vocabulary
     description: The CONCEPT_RELATIONSHIP table contains records that define relationships
       between any two Concepts and the nature or type of the relationship.
     attributes:
@@ -935,7 +935,7 @@ classes:
   ConceptSynonym:
     name: ConceptSynonym
     annotations:
-      domain: vocabulary
+      group: vocabulary
     description: The CONCEPT_SYNONYM table captures alternative terms, synonyms, and
       translations of Concept Name into various languages.
     attributes:
@@ -954,7 +954,7 @@ classes:
   Concept:
     name: Concept
     annotations:
-      domain: vocabulary
+      group: vocabulary
     description: The Standardized Vocabularies contains records, or Concepts, that
       uniquely identify each fundamental unit of meaning used to express clinical
       information in all domain tables of the CDM.
@@ -1008,7 +1008,7 @@ classes:
   ConditionOccurrence:
     name: ConditionOccurrence
     annotations:
-      domain: clinical
+      group: clinical
     description: This table captures records of conditions observed for a Person.
     attributes:
       condition_occurrence_id:
@@ -1078,7 +1078,7 @@ classes:
   Domain:
     name: Domain
     annotations:
-      domain: vocabulary
+      group: vocabulary
     description: The DOMAIN table includes a list of OMOP-defined Domains to which
       the Concepts of the Standardized Vocabularies can belong.
     attributes:
@@ -1101,7 +1101,7 @@ classes:
   DrugExposure:
     name: DrugExposure
     annotations:
-      domain: clinical
+      group: clinical
     description: This table captures records about the exposure to a Drug ingested
       or otherwise introduced into the body.
     attributes:
@@ -1199,7 +1199,7 @@ classes:
   Location:
     name: Location
     annotations:
-      domain: infrastructure
+      group: infrastructure
     description: The LOCATION table represents a generic way to capture physical location
       or address information of Persons and Care Sites.
     attributes:
@@ -1239,7 +1239,7 @@ classes:
   Note:
     name: Note
     annotations:
-      domain: clinical
+      group: clinical
     description: The NOTE table captures unstructured information that was recorded
       by a provider about a patient in free text notes on a given date.
     attributes:
@@ -1311,7 +1311,7 @@ classes:
   ObservationPeriod:
     name: ObservationPeriod
     annotations:
-      domain: clinical
+      group: clinical
     description: This table contains records which define spans of time during which
       Clinical Events that happened to the Person are recorded.
     attributes:
@@ -1347,7 +1347,7 @@ classes:
   Person:
     name: Person
     annotations:
-      domain: clinical
+      group: clinical
     description: This table serves as the central identity management for all Persons
       in the database.
     attributes:
@@ -1425,7 +1425,7 @@ classes:
   Relationship:
     name: Relationship
     annotations:
-      domain: vocabulary
+      group: vocabulary
     description: The RELATIONSHIP table provides a reference list of all types of
       relationships that can be used to associate any two Concepts.
     attributes:
@@ -1462,7 +1462,7 @@ classes:
   VisitOccurrence:
     name: VisitOccurrence
     annotations:
-      domain: clinical
+      group: clinical
     description: This table contains Events where Persons engage with the healthcare
       system for a duration of time.
     attributes:
@@ -1536,7 +1536,7 @@ classes:
   Vocabulary:
     name: Vocabulary
     annotations:
-      domain: vocabulary
+      group: vocabulary
     description: The VOCABULARY table includes a list of the Vocabularies integrated
       from various sources or created de novo in OMOP CDM.
     attributes:
