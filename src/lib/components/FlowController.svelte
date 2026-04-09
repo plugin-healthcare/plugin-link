@@ -1,10 +1,10 @@
 <script lang="ts">
   import { useSvelteFlow } from '@xyflow/svelte';
-  import type { ErdNodeData } from '$lib/types';
+  import type { ErdTableNodeData } from '$lib/types';
   import type { Node } from '@xyflow/svelte';
 
   interface Props {
-    panTarget: string | null;         // classId to pan to, or null
+    panTarget: string | null;         // nodeId to pan to (table or column), or null
     nodes: Node[];
     onpanned: () => void;             // called after pan so parent can clear panTarget
     onhighlight: (update: Node[]) => void;  // returns updated nodes array
@@ -22,27 +22,52 @@
     const node = getNode(panTarget);
     if (!node) { onpanned(); return; }
 
-    const x = (node.position.x ?? 0) + ((node.measured?.width ?? 260) / 2);
-    const y = (node.position.y ?? 0) + ((node.measured?.height ?? 36) / 2);
+    // For child (column) nodes, position is relative to the parent.
+    // Prefer node.internals.positionAbsolute which Svelte Flow keeps up-to-date
+    // even after the parent has been dragged post-layout.
+    // Fall back to manual parent-position addition only as a safety net.
+    const internalsAbs = (node as unknown as { internals?: { positionAbsolute?: { x: number; y: number } } }).internals?.positionAbsolute;
+    let absX: number;
+    let absY: number;
+    if (internalsAbs) {
+      absX = internalsAbs.x;
+      absY = internalsAbs.y;
+    } else {
+      absX = node.position.x ?? 0;
+      absY = node.position.y ?? 0;
+      if (node.parentId) {
+        const parent = getNode(node.parentId);
+        if (parent) {
+          absX += parent.position.x ?? 0;
+          absY += parent.position.y ?? 0;
+        }
+      }
+    }
 
-    setCenter(x, y, { zoom: 1.2, duration: 500 });
+    const w = node.measured?.width ?? 260;
+    const h = node.measured?.height ?? 24;
 
-    // Highlight on
+    setCenter(absX + w / 2, absY + h / 2, { zoom: 1.2, duration: 500 });
+
+    // Highlight the tableParent node (even when a column was searched).
+    // For column nodes, highlight their parent table for visual clarity.
+    const highlightId = node.parentId ?? panTarget;
+
     onhighlight(
       nodes.map((n) =>
-        n.id === panTarget
-          ? { ...n, data: { ...(n.data as unknown as ErdNodeData), highlighted: true } as unknown as Record<string, unknown> }
+        n.id === highlightId
+          ? { ...n, data: { ...(n.data as unknown as ErdTableNodeData), highlighted: true } as unknown as Record<string, unknown> }
           : n
       )
     );
 
     // Highlight off after 1.5 s
-    const id = panTarget;
+    const id = highlightId;
     setTimeout(() => {
       onhighlight(
         nodes.map((n) =>
           n.id === id
-            ? { ...n, data: { ...(n.data as unknown as ErdNodeData), highlighted: false } as unknown as Record<string, unknown> }
+            ? { ...n, data: { ...(n.data as unknown as ErdTableNodeData), highlighted: false } as unknown as Record<string, unknown> }
             : n
         )
       );

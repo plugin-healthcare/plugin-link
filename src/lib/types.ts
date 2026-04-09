@@ -144,14 +144,48 @@ export interface FileInfo {
 // ERD graph model — output of the parser, input to Svelte Flow
 // ---------------------------------------------------------------------------
 
+/**
+ * Data on a table parent node (type: 'tableParent').
+ * The parent node acts as a subflow container; its children are column nodes.
+ */
+export interface ErdTableNodeData {
+  label: string;
+  description: string;
+  collapsed: boolean;
+  highlighted?: boolean;
+  group?: string;    // propagated from ErdClass.group — drives header color
+  fileId?: string;   // propagated from ErdClass.fileId — drives left stripe color
+  slotCount: number; // total number of slots (used for sizing the parent node)
+}
+
+/**
+ * Data on a column child node (type: 'column').
+ * Positioned inside a tableParent node.
+ */
+export interface ErdColumnNodeData {
+  slotName: string;       // display name
+  slot_name: string;      // internal LinkML slot name
+  range: string;          // e.g. "integer", "string", "Concept"
+  required: boolean;
+  identifier: boolean;    // true = primary key
+  is_fk: boolean;         // true when range resolves to another class
+  description: string;
+  exact_mappings: string[]; // ETL mapping CURIEs
+  tableId: string;        // parent className — used for edge IDs
+}
+
+/**
+ * @deprecated Use ErdTableNodeData or ErdColumnNodeData instead.
+ * Kept for any transient references during migration.
+ */
 export interface ErdNodeData {
   label: string;
   description: string;
   slots: ErdSlot[];
   collapsed: boolean;
   highlighted?: boolean;
-  group?: string;   // propagated from ErdClass.group
-  fileId?: string;  // propagated from ErdClass.fileId — drives the left stripe color
+  group?: string;
+  fileId?: string;
 }
 
 export interface ErdEdgeData {

@@ -1,15 +1,30 @@
 <script lang="ts">
   import type { NormalizedSchema } from '$lib/types';
 
+  /**
+   * Separator used between class name and slot name in column node IDs.
+   * Must stay in sync with COL_ID_SEP in src/lib/layout.ts.
+   * A null byte cannot appear in LinkML identifiers, so it is unambiguous.
+   */
+  const COL_ID_SEP = '\x00';
+
   interface SearchResult {
-    classId: string;
+    /** The Svelte Flow node ID to pan to.
+     *  - Table match  → classId (e.g. "Person")
+     *  - Column match → "ClassName\x00slotName" (e.g. "Person\x00gender_concept_id")
+     */
+    nodeId: string;
+    /** Display label — always the class name */
     label: string;
+    /** Sub-label shown for column matches — the column name */
     sublabel?: string;
+    /** Badge shown next to the result */
+    kind: 'table' | 'column';
   }
 
   interface Props {
     schema: NormalizedSchema | null;
-    onselect: (classId: string) => void;
+    onselect: (nodeId: string) => void;
   }
 
   let { schema, onselect }: Props = $props();
@@ -19,7 +34,7 @@
   let inputEl: HTMLInputElement | undefined = $state();
   let open = $derived(query.trim().length > 0);
 
-  const MAX_RESULTS = 10;
+  const MAX_RESULTS = 12;
 
   const results = $derived.by<SearchResult[]>(() => {
     if (!schema || query.trim() === '') return [];
@@ -29,16 +44,22 @@
     for (const [classId, cls] of Object.entries(schema.classes)) {
       if (found.length >= MAX_RESULTS) break;
 
-      // Class name match
+      // Class name match (table) — highest priority
       if (cls.name.toLowerCase().includes(q)) {
-        found.push({ classId, label: cls.name });
+        found.push({ nodeId: classId, label: cls.name, kind: 'table' });
         continue;
       }
 
-      // Slot name match — report first matching slot
-      const matchingSlot = cls.slots.find((s) => s.name.toLowerCase().includes(q));
-      if (matchingSlot) {
-        found.push({ classId, label: cls.name, sublabel: matchingSlot.name });
+      // Column name matches — find all matching slots, up to 3 per table
+      const matchingSlots = cls.slots.filter((s) => s.name.toLowerCase().includes(q));
+      for (const slot of matchingSlots.slice(0, 3)) {
+        if (found.length >= MAX_RESULTS) break;
+        found.push({
+          nodeId: `${classId}${COL_ID_SEP}${slot.name}`,
+          label: cls.name,
+          sublabel: slot.name,
+          kind: 'column',
+        });
       }
     }
 
@@ -50,8 +71,8 @@
     activeIndex = -1;
   });
 
-  function select(classId: string) {
-    onselect(classId);
+  function select(nodeId: string) {
+    onselect(nodeId);
     query = '';
   }
 
@@ -67,9 +88,9 @@
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (activeIndex >= 0 && results[activeIndex]) {
-        select(results[activeIndex].classId);
+        select(results[activeIndex].nodeId);
       } else if (results.length > 0) {
-        select(results[0].classId);
+        select(results[0].nodeId);
       }
     } else if (e.key === 'Escape') {
       query = '';
@@ -98,11 +119,11 @@
       onkeydown={onKeydown}
       onblur={onBlur}
       type="search"
-      placeholder="Search classes or slots…"
+      placeholder="Search tables or columns…"
       autocomplete="off"
       spellcheck="false"
       disabled={!schema}
-      aria-label="Search classes and slots"
+      aria-label="Search tables and columns"
       aria-autocomplete="list"
     />
     <kbd class="kbd-hint">⌘K</kbd>
@@ -115,8 +136,11 @@
           role="option"
           aria-selected={i === activeIndex}
           class:active={i === activeIndex}
-          onmousedown={() => select(result.classId)}
+          onmousedown={() => select(result.nodeId)}
         >
+          <span class="kind-badge" class:kind-column={result.kind === 'column'}>
+            {result.kind === 'table' ? 'T' : 'C'}
+          </span>
           <span class="result-label">{result.label}</span>
           {#if result.sublabel}
             <span class="result-sublabel">› {result.sublabel}</span>
@@ -235,6 +259,27 @@
   .results li:hover,
   .results li.active {
     background: #f1f5f9;
+  }
+
+  /* T / C kind badge */
+  .kind-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    flex-shrink: 0;
+    background: #e2e8f0;
+    color: #475569;
+    letter-spacing: 0;
+  }
+
+  .kind-badge.kind-column {
+    background: #ede9fe;
+    color: #6366f1;
   }
 
   .result-label {
