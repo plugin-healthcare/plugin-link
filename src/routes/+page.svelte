@@ -8,7 +8,8 @@
     type Edge,
   } from '@xyflow/svelte';
 
-  import TableNode from '$lib/components/TableNode.svelte';
+  import TableParentNode from '$lib/components/TableParentNode.svelte';
+  import ColumnNode from '$lib/components/ColumnNode.svelte';
   import SchemaUploader from '$lib/components/SchemaUploader.svelte';
   import SearchBar from '$lib/components/SearchBar.svelte';
   import FlowController from '$lib/components/FlowController.svelte';
@@ -50,7 +51,7 @@
 
   // ---------------------------------------------------------------------------
   // Group config — set context synchronously with a reactive holder so
-  // TableNode can read it reactively once the fetch resolves.
+  // TableParentNode can read it reactively once the fetch resolves.
   // setContext must be called at init time (not inside onMount/async).
   // ---------------------------------------------------------------------------
   const groupCtx = $state<{ map: Map<string, GroupInfo> | null }>({ map: null });
@@ -64,9 +65,20 @@
   setContext('fileConfig', fileCtx);
 
   // ---------------------------------------------------------------------------
+  // Collapse context — TableParentNode calls toggle(id) to collapse/expand.
+  // setContext must be called synchronously at init time.
+  // ---------------------------------------------------------------------------
+  const collapseCtx = { toggle: (id: string) => {
+    const next = new Set(collapsed);
+    if (next.has(id)) { next.delete(id); } else { next.add(id); }
+    collapsed = next;
+  }};
+  setContext('collapseToggle', collapseCtx);
+
+  // ---------------------------------------------------------------------------
   // Node types registration
   // ---------------------------------------------------------------------------
-  const nodeTypes = { table: TableNode };
+  const nodeTypes = { tableParent: TableParentNode, column: ColumnNode };
 
   // ---------------------------------------------------------------------------
   // Workspace state — list of loaded files + which is active
@@ -314,8 +326,8 @@
   // ---------------------------------------------------------------------------
   // Search: set pan target — FlowController handles the pan
   // ---------------------------------------------------------------------------
-  function handleSearchSelect(classId: string) {
-    panTarget = classId;
+  function handleSearchSelect(nodeId: string) {
+    panTarget = nodeId;
   }
 
   // Reference to SearchBar component for programmatic focus
@@ -341,12 +353,13 @@
   // Helpers
   // ---------------------------------------------------------------------------
   const schemaName = $derived(schema?.name ?? 'Loading…');
-  const tableCount = $derived(nodes.filter((n) => n.type === 'table').length);
+  const tableCount = $derived(nodes.filter((n) => n.type === 'tableParent').length);
 
-  // Collect unique group names present in current nodes (for GroupLegend).
+  // Collect unique group names present in current tableParent nodes (for GroupLegend).
   const activeGroupNames = $derived(
     [...new Set(
       nodes
+        .filter((n) => n.type === 'tableParent')
         .map((n) => (n.data as unknown as { group?: string }).group)
         .filter((d): d is string => typeof d === 'string')
     )]
@@ -356,10 +369,11 @@
   const hasGroups = $derived(activeGroupNames.length > 0);
 
   // Build FileInfo list for the "Files" section in GroupLegend.
-  // Only include files whose classes actually appear in the current nodes.
+  // Only include files whose classes actually appear in the current tableParent nodes.
   const activeFileIds = $derived(
     [...new Set(
       nodes
+        .filter((n) => n.type === 'tableParent')
         .map((n) => (n.data as unknown as { fileId?: string }).fileId)
         .filter((id): id is string => typeof id === 'string')
     )]
@@ -479,6 +493,7 @@
             fitViewOptions={{ padding: 0.15 }}
             minZoom={0.1}
             maxZoom={2}
+            defaultEdgeOptions={{ zIndex: 1 }}
             proOptions={{ hideAttribution: false }}
           >
             <FlowController
@@ -496,6 +511,7 @@
             />
             <MiniMap
               nodeColor={(n) => {
+                if (n.type !== 'tableParent') return 'transparent';
                 const group = (n.data as unknown as { group?: string }).group;
                 const map = groupCtx.map;
                 if (!group || !map) return '#475569';
@@ -698,6 +714,21 @@
   /* Canvas */
   :global(.svelte-flow) {
     flex: 1;
+  }
+
+  /* Subflow parent node — transparent background, subtle border, no padding */
+  :global(.svelte-flow .svelte-flow__node.parent) {
+    background: transparent;
+    border: none;
+    padding: 0;
+    border-radius: 6px;
+  }
+
+  /* Column nodes — no default node styling */
+  :global(.svelte-flow .svelte-flow__node-column) {
+    background: transparent;
+    border: none;
+    padding: 0;
   }
 
   .empty-state,
