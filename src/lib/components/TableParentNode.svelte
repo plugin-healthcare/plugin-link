@@ -45,13 +45,10 @@
   })());
 
   // ---------------------------------------------------------------------------
-  // Collapse state (local mirror, synced from data prop)
+  // Collapse state — derived directly from data prop so it stays in sync
+  // without the round-trip latency of a $state/$effect pair.
   // ---------------------------------------------------------------------------
-  let collapsed = $state(false);
-
-  $effect(() => {
-    collapsed = rawData.collapsed;
-  });
+  const collapsed = $derived(rawData.collapsed);
 
   function toggleCollapse() {
     collapseCtx?.toggle(id);

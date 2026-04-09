@@ -52,7 +52,7 @@
   {#if primaryMapping()}
     <span
       class="slot-mapping"
-      title={rawData.exact_mappings.join('\n')}
+      title={rawData.exact_mappings?.join('\n')}
     >{primaryMapping()}</span>
   {/if}
 </div>

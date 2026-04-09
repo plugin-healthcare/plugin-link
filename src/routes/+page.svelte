@@ -66,13 +66,16 @@
 
   // ---------------------------------------------------------------------------
   // Collapse context — TableParentNode calls toggle(id) to collapse/expand.
+  // Wrapped in a $state object (consistent with groupCtx/fileCtx pattern) so
+  // the object reference is stable across re-renders while the function body
+  // always reads the current `collapsed` value from the reactive $state binding.
   // setContext must be called synchronously at init time.
   // ---------------------------------------------------------------------------
-  const collapseCtx = { toggle: (id: string) => {
+  const collapseCtx = $state({ toggle: (id: string) => {
     const next = new Set(collapsed);
     if (next.has(id)) { next.delete(id); } else { next.add(id); }
     collapsed = next;
-  }};
+  }});
   setContext('collapseToggle', collapseCtx);
 
   // ---------------------------------------------------------------------------
@@ -493,7 +496,6 @@
             fitViewOptions={{ padding: 0.15 }}
             minZoom={0.1}
             maxZoom={2}
-            defaultEdgeOptions={{ zIndex: 1 }}
             proOptions={{ hideAttribution: false }}
           >
             <FlowController

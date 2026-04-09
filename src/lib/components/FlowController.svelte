@@ -23,17 +23,24 @@
     if (!node) { onpanned(); return; }
 
     // For child (column) nodes, position is relative to the parent.
-    // Svelte Flow stores the absolute position in node.internals.positionAbsolute
-    // but the public API only gives us node.position (relative).
-    // We resolve the absolute position by walking up to the parent if needed.
-    let absX = node.position.x ?? 0;
-    let absY = node.position.y ?? 0;
-
-    if (node.parentId) {
-      const parent = getNode(node.parentId);
-      if (parent) {
-        absX += parent.position.x ?? 0;
-        absY += parent.position.y ?? 0;
+    // Prefer node.internals.positionAbsolute which Svelte Flow keeps up-to-date
+    // even after the parent has been dragged post-layout.
+    // Fall back to manual parent-position addition only as a safety net.
+    const internalsAbs = (node as unknown as { internals?: { positionAbsolute?: { x: number; y: number } } }).internals?.positionAbsolute;
+    let absX: number;
+    let absY: number;
+    if (internalsAbs) {
+      absX = internalsAbs.x;
+      absY = internalsAbs.y;
+    } else {
+      absX = node.position.x ?? 0;
+      absY = node.position.y ?? 0;
+      if (node.parentId) {
+        const parent = getNode(node.parentId);
+        if (parent) {
+          absX += parent.position.x ?? 0;
+          absY += parent.position.y ?? 0;
+        }
       }
     }
 

@@ -46,20 +46,38 @@ function estimateParentHeight(slotCount: number, collapsed: boolean): number {
 // ID helpers
 // ---------------------------------------------------------------------------
 
-/** Column node ID: "ClassName__slotName" */
+/**
+ * Separator used between class name and slot name in column node IDs.
+ * A null byte (\x00) is chosen because it cannot appear in LinkML identifiers
+ * (which follow XML NCName rules: alphanumeric + underscore + hyphen + dot).
+ * This avoids ambiguity when class or slot names contain "__".
+ */
+const COL_ID_SEP = '\x00';
+
+/** Column node ID: "ClassName\x00slotName" */
 function colId(className: string, slotName: string): string {
-  return `${className}__${slotName}`;
+  return `${className}${COL_ID_SEP}${slotName}`;
 }
 
 /**
- * Find the identifier (PK) slot of a class, returning its node ID.
- * Falls back to the parent table node ID when no PK slot exists.
+ * Find the identifier (PK) slot of a class, returning its column node ID.
+ * Falls back to the first slot's column node ID when no PK slot exists.
+ * When the table is collapsed, returns the parent table node ID instead so
+ * edges connect to the visible table header rather than a missing column node.
  */
-function resolvePkNodeId(className: string, schema: NormalizedSchema): string {
+function resolvePkNodeId(
+  className: string,
+  schema: NormalizedSchema,
+  collapsed: Set<string>
+): string {
+  if (collapsed.has(className)) return className;
   const cls = schema.classes[className];
   if (!cls) return className;
   const pk = cls.slots.find((s) => s.identifier);
-  return pk ? colId(className, pk.name) : className;
+  if (pk) return colId(className, pk.name);
+  // Fall back to the first slot instead of the bare table ID so the edge
+  // always connects to a column-level node when the table is expanded.
+  return cls.slots.length > 0 ? colId(className, cls.slots[0].name) : className;
 }
 
 // ---------------------------------------------------------------------------
@@ -89,16 +107,20 @@ type EtlEdge = {
 
 type AnyEdge = FkEdge | EtlEdge;
 
-function collectEdges(schema: NormalizedSchema): FkEdge[] {
+function collectEdges(schema: NormalizedSchema, collapsed: Set<string>): FkEdge[] {
   const classNames = new Set(Object.keys(schema.classes));
   const result: FkEdge[] = [];
   for (const [className, cls] of Object.entries(schema.classes)) {
     for (const slot of cls.slots) {
       if (slot.is_fk && classNames.has(slot.range) && slot.range !== className) {
+        // Source: if this table is collapsed, use table ID; otherwise use column ID
+        const source = collapsed.has(className)
+          ? className
+          : colId(className, slot.name);
         result.push({
           kind: 'fk',
-          source: colId(className, slot.name),
-          target: resolvePkNodeId(slot.range, schema),
+          source,
+          target: resolvePkNodeId(slot.range, schema, collapsed),
           slotName: slot.name,
           required: slot.required,
           layoutSource: className,
@@ -110,7 +132,7 @@ function collectEdges(schema: NormalizedSchema): FkEdge[] {
   return result;
 }
 
-function collectEtlEdges(schema: NormalizedSchema): EtlEdge[] {
+function collectEtlEdges(schema: NormalizedSchema, collapsed: Set<string>): EtlEdge[] {
   const classNames = new Set(Object.keys(schema.classes));
   const result: EtlEdge[] = [];
   for (const [className, cls] of Object.entries(schema.classes)) {
@@ -121,10 +143,14 @@ function collectEtlEdges(schema: NormalizedSchema): EtlEdge[] {
         if (colonIdx < 0 || dotIdx < 0) continue;
         const targetClass = mapping.slice(colonIdx + 1, dotIdx);
         if (classNames.has(targetClass) && targetClass !== className) {
+          // Source: if this table is collapsed, use table ID; otherwise use column ID
+          const source = collapsed.has(className)
+            ? className
+            : colId(className, slot.name);
           result.push({
             kind: 'etl',
-            source: colId(className, slot.name),
-            target: resolvePkNodeId(targetClass, schema),
+            source,
+            target: resolvePkNodeId(targetClass, schema, collapsed),
             slotName: slot.name,
             layoutSource: className,
             layoutTarget: targetClass,
@@ -227,8 +253,12 @@ function buildTableParentNode(
 function buildColumnNodes(
   className: string,
   schema: NormalizedSchema,
+  collapsed: Set<string>,
   isLR: boolean
 ): Node[] {
+  // Guard: never produce child nodes for collapsed tables — their column IDs
+  // would be absent from the nodes array, causing dangling edge references.
+  if (collapsed.has(className)) return [];
   const cls = schema.classes[className];
   return cls.slots.map((slot, index) => ({
     id: colId(className, slot.name),
@@ -266,8 +296,8 @@ function buildGraphDagre(
   collapsed: Set<string>,
   direction: 'LR' | 'TB'
 ): { nodes: Node[]; edges: Edge[] } {
-  const fkEdges = collectEdges(schema);
-  const etlEdges = collectEtlEdges(schema);
+  const fkEdges = collectEdges(schema, collapsed);
+  const etlEdges = collectEtlEdges(schema, collapsed);
   const allEdges: AnyEdge[] = [...fkEdges, ...etlEdges];
 
   // --- Run dagre on tables only ---
@@ -308,7 +338,7 @@ function buildGraphDagre(
     tableNodes.push(buildTableParentNode(className, schema, collapsed, position, isLR));
 
     if (!collapsed.has(className)) {
-      columnNodes.push(...buildColumnNodes(className, schema, isLR));
+      columnNodes.push(...buildColumnNodes(className, schema, collapsed, isLR));
     }
   }
 
@@ -328,8 +358,8 @@ async function buildGraphElk(
   const ELK = (await import('elkjs/lib/elk.bundled.js')).default;
   const elk = new ELK();
 
-  const fkEdges = collectEdges(schema);
-  const etlEdges = collectEtlEdges(schema);
+  const fkEdges = collectEdges(schema, collapsed);
+  const etlEdges = collectEtlEdges(schema, collapsed);
   const allEdges: AnyEdge[] = [...fkEdges, ...etlEdges];
   const isLR = direction === 'LR';
 
@@ -375,7 +405,7 @@ async function buildGraphElk(
     tableNodes.push(buildTableParentNode(className, schema, collapsed, pos, isLR));
 
     if (!collapsed.has(className)) {
-      columnNodes.push(...buildColumnNodes(className, schema, isLR));
+      columnNodes.push(...buildColumnNodes(className, schema, collapsed, isLR));
     }
   }
 

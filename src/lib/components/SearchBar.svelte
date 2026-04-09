@@ -1,10 +1,17 @@
 <script lang="ts">
   import type { NormalizedSchema } from '$lib/types';
 
+  /**
+   * Separator used between class name and slot name in column node IDs.
+   * Must stay in sync with COL_ID_SEP in src/lib/layout.ts.
+   * A null byte cannot appear in LinkML identifiers, so it is unambiguous.
+   */
+  const COL_ID_SEP = '\x00';
+
   interface SearchResult {
     /** The Svelte Flow node ID to pan to.
      *  - Table match  → classId (e.g. "Person")
-     *  - Column match → "ClassName__slotName" (e.g. "Person__gender_concept_id")
+     *  - Column match → "ClassName\x00slotName" (e.g. "Person\x00gender_concept_id")
      */
     nodeId: string;
     /** Display label — always the class name */
@@ -48,7 +55,7 @@
       for (const slot of matchingSlots.slice(0, 3)) {
         if (found.length >= MAX_RESULTS) break;
         found.push({
-          nodeId: `${classId}__${slot.name}`,
+          nodeId: `${classId}${COL_ID_SEP}${slot.name}`,
           label: cls.name,
           sublabel: slot.name,
           kind: 'column',
